@@ -11,7 +11,7 @@ import { AgentCard } from "@/components/agents/agent-card"
 import { EmptyState } from "@/components/agents/empty-state"
 import { useAgents } from "@/hooks/use-agents"
 import { useRouter } from "next/navigation"
-import { agentService } from "@/services/agent.service"
+import { agentService } from "@/services"
 import { useToast } from "@/hooks/ui/use-toast"
 
 export default function AgentsPage() {

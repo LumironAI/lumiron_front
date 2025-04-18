@@ -29,3 +29,10 @@ export const getSupabaseClient = () => {
   console.log("🔄 Creating new Supabase client instance")
   return createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseOptions)
 }
+
+// Cette fonction est utilisée pour obtenir un client authentifié
+// pour les appels aux services nécessitant une authentification
+export const getAuthenticatedClient = async () => {
+  // Réutiliser l'instance existante car elle maintient déjà la session
+  return supabase
+}
