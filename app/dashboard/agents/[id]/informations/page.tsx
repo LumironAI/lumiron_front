@@ -39,6 +39,7 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [isAgentLoaded, setIsAgentLoaded] = useState(false)
 
   // États pour les champs obligatoires
   const [establishment, setEstablishment] = useState(agentData.establishment || "")
@@ -113,10 +114,16 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
 
   // Load agent data if we have an ID
   useEffect(() => {
+    // Éviter de charger l'agent plus d'une fois
+    if (isAgentLoaded) {
+      return;
+    }
+    
     async function loadAgentData() {
       try {
         if (agentId) {
           setIsInitializing(true)
+          setIsAgentLoaded(true)
           const { data, error } = await agentService.getAgentById(agentId)
 
           if (error) {
@@ -125,17 +132,32 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
 
           if (data) {
             // Update context with loaded data and defaults for missing fields
-            const agentData = {
+            const updatedAgentData = {
               id: data.id.toString(),
               name: data.name,
               status: data.status,
-              sector: "restaurant", // Default sector
-              openingHours: defaultOpeningHours,
-              options: defaultOptions,
-              foodOptions: defaultFoodOptions,
+              sector: data.sector || "restaurant", // Default sector
+              establishment: data.establishment || "",
+              website: data.website || "",
+              address: data.address || "",
+              city: data.city || "",
+              openingHours: data.openingHours || defaultOpeningHours,
+              options: data.options || defaultOptions,
+              foodOptions: data.foodOptions || defaultFoodOptions,
+              closureDays: data.closureDays || { enabled: false, dates: [] },
+              additionalInfo: data.additionalInfo || "",
             }
 
-            updateAgentData(agentData)
+            // Mettre à jour les états locaux
+            setEstablishment(updatedAgentData.establishment)
+            setWebsite(updatedAgentData.website)
+            setAddress(updatedAgentData.address)
+            setCity(updatedAgentData.city)
+            setClosureDaysEnabled(updatedAgentData.closureDays.enabled)
+            setClosureDates(updatedAgentData.closureDays.dates)
+            setAdditionalInfo(updatedAgentData.additionalInfo)
+
+            updateAgentData(updatedAgentData)
             setAgentId(agentId)
           }
         }
@@ -152,7 +174,7 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
     }
 
     loadAgentData()
-  }, [agentId, updateAgentData, setAgentId, toast])
+  }, [agentId, isAgentLoaded, updateAgentData, setAgentId, toast])
 
   // Gestionnaires d'événements pour les changements de valeurs
   const handleEstablishmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {

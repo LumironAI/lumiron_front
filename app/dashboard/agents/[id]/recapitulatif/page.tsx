@@ -24,20 +24,44 @@ export default function AgentRecapPage({ params }: { params: Promise<{ id: strin
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [isAgentLoaded, setIsAgentLoaded] = useState(false)
 
   // Load agent data if we have an ID
   useEffect(() => {
+    // Éviter de charger l'agent plus d'une fois
+    if (isAgentLoaded) {
+      return;
+    }
+    
     async function loadAgentData() {
       try {
         if (agentId) {
           setIsInitializing(true)
+          setIsAgentLoaded(true)
           const { data, error } = await agentService.getAgentById(agentId)
           if (data) {
-            // Update context with loaded data
+            // Update context with loaded data without losing existing data
             updateAgentData({
               id: agentId,
               name: data.name,
               status: data.status,
+              // Conserver les autres propriétés telles que le secteur, les horaires, etc.
+              sector: data.sector || agentData.sector,
+              establishment: data.establishment || agentData.establishment,
+              website: data.website || agentData.website,
+              address: data.address || agentData.address,
+              city: data.city || agentData.city,
+              phoneNumber: data.phoneNumber || agentData.phoneNumber,
+              deviceType: data.deviceType || agentData.deviceType,
+              voiceGender: data.voiceGender || agentData.voiceGender,
+              voiceType: data.voiceType || agentData.voiceType,
+              openingHours: data.openingHours || agentData.openingHours,
+              options: data.options || agentData.options,
+              foodOptions: data.foodOptions || agentData.foodOptions,
+              closureDays: data.closureDays || agentData.closureDays,
+              additionalInfo: data.additionalInfo || agentData.additionalInfo,
+              documents: data.documents || agentData.documents,
+              integrations: data.integrations || agentData.integrations,
             })
             setAgentId(agentId)
           }
@@ -55,7 +79,7 @@ export default function AgentRecapPage({ params }: { params: Promise<{ id: strin
     }
 
     loadAgentData()
-  }, [agentId, updateAgentData, setAgentId, toast])
+  }, [agentId, isAgentLoaded, updateAgentData, setAgentId, toast])
 
   const handlePrevious = () => {
     router.push(`/dashboard/agents/${agentId}/configuration`)

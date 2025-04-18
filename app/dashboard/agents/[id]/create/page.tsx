@@ -22,12 +22,19 @@ export default function AgentCreatePage() {
   const { agentData, updateAgentData, setAgentId } = useAgentCreation()
   const [agentName, setAgentName] = useState(agentData.name || "")
   const [agentSector, setAgentSector] = useState(agentData.sector || "restaurant")
+  const [isAgentLoaded, setIsAgentLoaded] = useState(false)
 
   useEffect(() => {
+    // Éviter de charger l'agent plus d'une fois
+    if (isAgentLoaded) {
+      return;
+    }
+
     async function loadAgent() {
       // Si on a un ID, on charge l'agent
       if (agentId) {
         try {
+          setIsAgentLoaded(true);
           const { data, error } = await agentService.getAgentById(agentId)
           if (error) {
             toast({
@@ -44,7 +51,6 @@ export default function AgentCreatePage() {
             setAgentSector(data.sector || "restaurant")
             // On met à jour le contexte
             updateAgentData({
-              ...agentData,
               name: data.name || "",
               sector: data.sector || "restaurant",
             })
@@ -62,7 +68,7 @@ export default function AgentCreatePage() {
     }
 
     loadAgent()
-  }, [agentId, agentData, updateAgentData, setAgentId, toast])
+  }, [agentId, isAgentLoaded, updateAgentData, setAgentId, toast])
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAgentName(e.target.value)
