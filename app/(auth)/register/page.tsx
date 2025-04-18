@@ -138,7 +138,7 @@ export default function RegisterPage() {
     try {
       const success = await register(formData)
       if (success) {
-        router.push("/agents")
+        router.push("/dashboard/agents")
       }
     } finally {
       setIsSubmitting(false)

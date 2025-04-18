@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import type React from "react"
 import { useState, useRef, useEffect, use } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { Clock, CalendarX, Settings, Info, FileText, Plus } from "lucide-react"
+import { Clock, CalendarX, Settings, Info, FileText, Plus, Coffee, Utensils } from "lucide-react"
 import { fr } from "date-fns/locale"
 import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
@@ -333,6 +333,19 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
     updateAgentData({ ...agentData, openingHours: updatedOpeningHours })
   }
 
+  const handleOpeningHoursTimeChange = (
+    day: string, 
+    period: "lunch" | "dinner", 
+    type: "start" | "end", 
+    time: string
+  ) => {
+    const updatedOpeningHours = { ...agentData.openingHours }
+    if (updatedOpeningHours[day]) {
+      updatedOpeningHours[day][period][type] = time
+    }
+    updateAgentData({ ...agentData, openingHours: updatedOpeningHours })
+  }
+
   const handleOptionChange = (option: string, checked: boolean) => {
     const updatedOptions = { ...agentData.options }
     updatedOptions[option] = checked
@@ -356,24 +369,25 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
 
   return (
     <AgentCreationLayout agentId={agentId} activeTab="informations">
+      {/* Informations principales */}
       <SectionCard title="Informations principales">
-        <div ref={establishmentRef}>
+        <div ref={establishmentRef} className="mb-4">
           <FormRow
             label="Nom de l'établissement"
             required
             error={isSubmitted && errors.establishment ? "Champ requis" : undefined}
           >
-            <Input value={establishment} onChange={handleEstablishmentChange} />
+            <Input value={establishment} onChange={handleEstablishmentChange} className="w-full" />
           </FormRow>
         </div>
-        <div ref={websiteRef}>
+        <div ref={websiteRef} className="mb-4">
           <FormRow label="Site web">
-            <Input value={website} onChange={handleWebsiteChange} type="url" placeholder="https://..." />
+            <Input value={website} onChange={handleWebsiteChange} type="url" placeholder="https://..." className="w-full" />
           </FormRow>
         </div>
-        <div ref={addressRef}>
+        <div ref={addressRef} className="mb-4">
           <FormRow label="Adresse">
-            <Input value={address} onChange={handleAddressChange} />
+            <Input value={address} onChange={handleAddressChange} className="w-full" />
           </FormRow>
         </div>
         <div ref={cityRef}>
@@ -382,119 +396,136 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
             required
             error={isSubmitted && errors.city ? "Champ requis" : undefined}
           >
-            <Input value={city} onChange={handleCityChange} />
+            <Input value={city} onChange={handleCityChange} className="w-full" />
           </FormRow>
         </div>
       </SectionCard>
 
-      <SectionCard icon={<Clock className="h-5 w-5" />} title="Horaires d'ouverture" iconColor="bg-icon-clock">
-        <FormRow>
-          <div className="space-y-6">
-            {Object.entries(agentData.openingHours || defaultOpeningHours).map(([day, periods]) => (
-              <OpeningHoursRow
-                key={day}
-                day={day}
-                lunchHours={periods.lunch}
-                dinnerHours={periods.dinner}
-                onToggle={handleOpeningHoursChange}
+      {/* Horaires d'ouverture */}
+      <SectionCard icon={<Clock className="h-5 w-5" />} title="Horaires d'ouverture" iconColor="bg-sky-100">
+        {/* En-tête du tableau */}
+        <div className="grid grid-cols-7 items-center py-2 border-b font-medium text-sm">
+          <div></div>
+          <div className="text-center">Midi</div>
+          <div className="col-span-2 text-center">Horaire</div>
+          <div className="text-center">Soir</div>
+          <div className="col-span-2 text-center">Horaire</div>
+        </div>
+        
+        {/* Jours de la semaine */}
+        <div className="space-y-0">
+          {Object.entries(agentData.openingHours || defaultOpeningHours).map(([day, periods]) => (
+            <OpeningHoursRow
+              key={day}
+              day={day}
+              lunchHours={periods.lunch}
+              dinnerHours={periods.dinner}
+              onToggle={handleOpeningHoursChange}
+              onTimeChange={handleOpeningHoursTimeChange}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* Jours de fermeture */}
+      <SectionCard icon={<CalendarX className="h-5 w-5" />} title="Jours de fermeture" iconColor="bg-red-100">
+        <div className="w-full">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium">Périodes de fermeture</span>
+            <Switch checked={closureDaysEnabled} onCheckedChange={handleClosureDaysEnabledChange} />
+          </div>
+          {closureDaysEnabled && (
+            <div className="border rounded-lg p-4">
+              <Calendar
+                mode="multiple"
+                selected={closureDates}
+                onSelect={handleClosureDatesChange}
+                className="mx-auto"
+                locale={fr}
+              />
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Options disponibles et alimentaires */}
+      <SectionCard>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="bg-gray-100 p-2 rounded-md">
+            <Settings className="h-5 w-5 text-gray-600" />
+          </div>
+          <h3 className="font-medium text-base">Options & Services</h3>
+        </div>
+        <div className="w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
+            {Object.entries(agentData.options || defaultOptions).map(([option, isChecked]) => (
+              <OptionToggle
+                key={option}
+                label={option}
+                checked={isChecked}
+                onCheckedChange={(checked) => handleOptionChange(option, checked)}
               />
             ))}
           </div>
-        </FormRow>
-      </SectionCard>
-
-      <SectionCard icon={<CalendarX className="h-5 w-5" />} title="Jours de fermeture" iconColor="bg-icon-closure">
-        <FormRow>
-          <div className="w-full space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Périodes de fermeture</span>
-              <Switch checked={closureDaysEnabled} onCheckedChange={handleClosureDaysEnabledChange} />
-            </div>
-            {closureDaysEnabled && (
-              <div className="border rounded-lg p-3 mt-3">
-                <Calendar
-                  mode="multiple"
-                  selected={closureDates}
-                  onSelect={handleClosureDatesChange}
-                  className="mx-auto"
-                  locale={fr}
-                />
-              </div>
-            )}
+          <div className="flex justify-end mt-2">
+            <Button variant="ghost" className="text-blue-500 flex items-center text-xs">
+              <Plus className="h-3 w-3 mr-1" /> Ajouter une option
+            </Button>
           </div>
-        </FormRow>
+        </div>
       </SectionCard>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SectionCard icon={<Settings className="h-5 w-5" />} title="Options disponibles" iconColor="bg-icon-settings">
-          <FormRow>
-            <div className="w-full">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {Object.entries(agentData.options || defaultOptions).map(([option, isChecked]) => (
-                  <OptionToggle
-                    key={option}
-                    label={option}
-                    checked={isChecked}
-                    onCheckedChange={(checked) => handleOptionChange(option, checked)}
-                  />
-                ))}
-              </div>
-            </div>
-          </FormRow>
-          <FormRow>
-            <div className="flex justify-end">
-              <Button variant="ghost" className="text-primary flex items-center">
-                <Plus className="h-4 w-4 mr-1" /> Ajouter une option
-              </Button>
-            </div>
-          </FormRow>
-        </SectionCard>
+      <SectionCard>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="bg-amber-50 p-2 rounded-md">
+            <Utensils className="h-5 w-5 text-amber-500" />
+          </div>
+          <h3 className="font-medium text-base">Options alimentaires</h3>
+        </div>
+        <div className="w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
+            {Object.entries(agentData.foodOptions || defaultFoodOptions).map(([option, isChecked]) => (
+              <OptionToggle
+                key={option}
+                label={option}
+                checked={isChecked}
+                onCheckedChange={(checked) => handleFoodOptionChange(option, checked)}
+              />
+            ))}
+          </div>
+          <div className="flex justify-end mt-2">
+            <Button variant="ghost" className="text-blue-500 flex items-center text-xs">
+              <Plus className="h-3 w-3 mr-1" /> Ajouter une option
+            </Button>
+          </div>
+        </div>
+      </SectionCard>
 
-        <SectionCard icon={<Settings className="h-5 w-5" />} title="Options alimentaires" iconColor="bg-icon-settings">
-          <FormRow>
-            <div className="w-full">
-              <div className="grid grid-cols-1 gap-3">
-                {Object.entries(agentData.foodOptions || defaultFoodOptions).map(([option, isChecked]) => (
-                  <OptionToggle
-                    key={option}
-                    label={option}
-                    checked={isChecked}
-                    onCheckedChange={(checked) => handleFoodOptionChange(option, checked)}
-                  />
-                ))}
-              </div>
-            </div>
-          </FormRow>
-          <FormRow>
-            <div className="flex justify-end">
-              <Button variant="ghost" className="text-primary flex items-center">
-                <Plus className="h-4 w-4 mr-1" /> Ajouter une option
-              </Button>
-            </div>
-          </FormRow>
-        </SectionCard>
-      </div>
-
-      <SectionCard icon={<FileText className="h-5 w-5" />} title="Documents" iconColor="bg-icon-document">
+      {/* Documents */}
+      <SectionCard icon={<FileText className="h-5 w-5" />} title="Documents" iconColor="bg-blue-100">
         <FileUpload label="Importer documents" acceptedFormats="Format accepté: PDF (max10MB)" />
       </SectionCard>
 
-      <SectionCard icon={<Info className="h-5 w-5" />} title="Informations complémentaires" iconColor="bg-icon-info">
+      {/* Informations complémentaires */}
+      <SectionCard icon={<Info className="h-5 w-5" />} title="Informations complémentaires" iconColor="bg-yellow-100">
         <Textarea
           placeholder="Ajoutez des informations complémentaires ici..."
-          className="min-h-[100px]"
+          className="min-h-[100px] w-full"
           value={additionalInfo}
           onChange={handleAdditionalInfoChange}
-          onBlur={() => updateAgentData({ additionalInfo })}
+          onBlur={() => updateAgentData({ ...agentData, additionalInfo })}
         />
       </SectionCard>
 
-      <ActionButtons
-        onPrevious={handlePrevious}
-        onSaveAsDraft={handleSaveAsDraft}
-        onContinue={handleContinue}
-        disabled={isLoading}
-      />
+      {/* Boutons d'action */}
+      <div className="flex justify-between mt-6">
+        <ActionButtons
+          onPrevious={handlePrevious}
+          onSaveAsDraft={handleSaveAsDraft}
+          onContinue={handleContinue}
+          disabled={isLoading}
+        />
+      </div>
     </AgentCreationLayout>
   )
 }

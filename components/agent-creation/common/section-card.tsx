@@ -9,17 +9,17 @@ interface SectionCardProps {
   children: ReactNode
 }
 
-export function SectionCard({ icon, title, className, iconColor = "bg-muted", children }: SectionCardProps) {
+export function SectionCard({ icon, title, className, iconColor = "bg-gray-100", children }: SectionCardProps) {
   return (
-    <div className={cn("bg-white rounded-lg p-6 mb-6 shadow-sm", className)}>
+    <div className={cn("bg-white rounded-lg p-5 mb-5 shadow-sm border border-gray-100", className)}>
       {(icon || title) && (
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-5">
           {icon && (
-            <div className={cn("p-2 rounded-full", iconColor)}>
-              <div className="text-foreground">{icon}</div>
+            <div className={cn("p-2 rounded-md", iconColor)}>
+              <div className="text-gray-600">{icon}</div>
             </div>
           )}
-          {title && <h3 className="font-medium text-lg">{title}</h3>}
+          {title && <h3 className="font-medium text-base">{title}</h3>}
         </div>
       )}
       <div>{children}</div>

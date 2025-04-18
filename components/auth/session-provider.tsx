@@ -97,7 +97,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
         // User is authenticated and trying to access an auth route
         console.log("🔄 Redirecting to /agents from auth route:", pathname)
         redirectInProgressRef.current = true
-        router.push("/agents")
+        router.push("/dashboard/agents")
       }
 
       // Reset redirect flag after a delay
