@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/ui/use-toast"
 import { supabase } from "@/lib/supabase-client"
-import type { User as SupabaseUser, Session } from "@supabase/supabase-js"
+import type { User as SupabaseUser, Session, AuthChangeEvent } from "@supabase/supabase-js"
 
 // Define types for our context
 export interface User {
@@ -32,7 +32,7 @@ interface AuthContextType {
   isLoading: boolean
   session: Session | null
   isAuthenticated: boolean // Add this new property
-  login: (email: string, password: string) => Promise<boolean>
+  login: (email: string, password: string, fromPath: string) => Promise<boolean>
   register: (data: RegisterData) => Promise<boolean>
   logout: () => Promise<void>
   forgotPassword: (email: string) => Promise<boolean>
@@ -54,58 +54,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const { toast } = useToast()
 
-  // Improve the getUserFromSession function to handle delays better
+  // Utility function for delays
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Improve the getUserFromSession function to handle delays better using retry logic
   const getUserFromSession = async (session: Session | null) => {
     console.log("🔍 Getting user from session", { sessionExists: !!session })
     if (!session) return null
 
-    try {
-      // Fetch user profile data from your users table
-      console.log("🔍 Fetching user data from Supabase with auth_id:", session.user.id)
+    const MAX_RETRIES = 3;
+    const INITIAL_DELAY = 500; // ms
 
-      // Add a delay to allow for database propagation
-      // This is especially important after registration
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      const { data: userData, error } = await supabase.from("users").select("*").eq("auth_id", session.user.id).single()
-
-      if (error) {
-        console.error("❌ Error fetching user data:", error)
-
-        // If no rows returned or multiple rows, retry with a longer delay
-        if (error.message.includes("no rows") || error.message.includes("multiple")) {
-          console.log("⏳ No user found yet, retrying after delay...")
-
-          // Increase delay for retry
-          await new Promise((resolve) => setTimeout(resolve, 2000))
-
-          const { data: retryData, error: retryError } = await supabase
+    const fetchUserData = async () => {
+        return await supabase
             .from("users")
             .select("*")
             .eq("auth_id", session.user.id)
-            .single()
+            .single();
+    };
 
-          if (retryError) {
-            console.error("❌ Error on retry:", retryError)
-            throw retryError
+    try {
+      // Initial fetch attempt
+      console.log("🔍 Fetching user data from Supabase with auth_id:", session.user.id)
+      let { data: userData, error } = await fetchUserData();
+
+      // Retry logic specifically for "no rows" or "multiple rows" error, likely after registration
+      if (error && (error.message.includes("no rows") || error.message.includes("multiple"))) {
+          console.warn(`⏳ User data not immediately found for ${session.user.id}, initiating retries...`);
+          let currentDelay = INITIAL_DELAY;
+          for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+              console.log(`⏳ Retry attempt ${attempt}/${MAX_RETRIES} after ${currentDelay}ms...`);
+              await delay(currentDelay);
+              const { data: retryData, error: retryError } = await fetchUserData();
+
+              if (retryData) {
+                  console.log(`✅ User data fetched on retry attempt ${attempt}:`, retryData);
+                  userData = retryData; // Use the successfully fetched data
+                  error = null;       // Clear the error
+                  break;              // Exit retry loop
+              }
+
+              if (retryError && !(retryError.message.includes("no rows") || retryError.message.includes("multiple"))) {
+                  // If a different error occurs during retry, don't continue retrying for "no rows"
+                  console.error(`❌ Non-recoverable error on retry attempt ${attempt}:`, retryError);
+                  error = retryError; // Keep the latest significant error
+                  break; // Exit retry loop
+              } else if (retryError) {
+                  console.warn(`⏳ Still no user data on attempt ${attempt}:`, retryError.message);
+              }
+
+              // Increase delay for next attempt (exponential backoff)
+              currentDelay *= 2;
           }
+      }
 
-          if (retryData) {
-            console.log("✅ User data fetched on retry:", retryData)
-            return {
-              id: retryData.id,
-              firstName: retryData.first_name || retryData.name?.split(" ")[0] || "",
-              lastName: retryData.last_name || retryData.name?.split(" ")[1] || "",
-              email: retryData.email || session.user.email || "",
-              phone: retryData.phone || session.user.phone || "",
-              role: retryData.role || "user",
-              supabaseUser: session.user,
-            } as User
-          }
-        }
-
-        // If still no data after retry, try to create a minimal user object from session
-        console.log("⚠️ Creating minimal user from session data")
+      // Handle final error state after initial fetch or retries
+      if (error) {
+        console.error("❌ Error fetching user data after retries (or initial non-retry error):", error);
+        // Fallback to minimal user object if still no data
+        console.log("⚠️ Creating minimal user from session data as fallback");
         return {
           id: -1, // Temporary ID
           firstName: session.user.user_metadata?.first_name || "",
@@ -114,11 +121,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phone: session.user.phone || session.user.user_metadata?.phone || "",
           role: "user",
           supabaseUser: session.user,
-          isTemporary: true, // Flag to indicate this is not from database
-        } as User
+          // Add a flag to indicate this user data might be incomplete
+          // isTemporary: true,
+        } as User; // Consider defining a type that includes isTemporary if needed downstream
       }
 
-      console.log("✅ User data fetched:", userData)
+      // Process successful fetch (initial or retry)
+      console.log("✅ User data fetched successfully:", userData);
       if (userData) {
         return {
           id: userData.id,
@@ -228,7 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("🔄 Setting up auth state listener")
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, newSession: Session | null) => {
       console.log("🔔 Auth state changed:", event, newSession?.user?.email)
 
       setSession(newSession)
@@ -240,8 +249,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log("👤 User data after sign in:", userData)
           setUser(userData)
         }
-      } else if (event === "SIGNED_OUT" || event === "USER_DELETED") {
-        console.log("🚪 User signed out or deleted")
+      } else if (event === "SIGNED_OUT") { // Rely on SIGNED_OUT for session invalidation
+        console.log("🚪 User signed out") // Update log message
         setUser(null)
         setSession(null)
         router.push("/login")
@@ -335,10 +344,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log("💳 Subscription created successfully")
         }
 
-        // Wait a bit to ensure data is properly saved
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        // Get created user to update context
+        // Get created user to update context (getUserFromSession now handles potential delays)
         const newUserData = await getUserFromSession({
           ...authData.session!,
           user: authData.user,
@@ -355,8 +361,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           variant: "success",
         })
 
-        // Remove direct redirect - let SessionProvider handle it
-        // router.push("/agents")
+        router.push("/dashboard/agents")
         return true
       }
 
@@ -376,7 +381,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // Login function
-  const login = async (email: string, password: string): Promise<boolean> => {
+  // Add fromPath parameter
+  const login = async (email: string, password: string, fromPath: string): Promise<boolean> => {
     console.log("🔑 Login attempt for email:", email)
     setIsLoading(true)
     try {
@@ -407,9 +413,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             variant: "success",
           })
 
-          // Remove direct redirect - let SessionProvider handle it
-          // router.push("/agents")
-          return true
+          // Use router.push for client-side navigation
+          console.log(`🚀 Triggering client-side redirect to ${fromPath} after login`)
+          router.push(fromPath);
+          return true;
         } else {
           console.error("❌ User data not found after login")
           toast({

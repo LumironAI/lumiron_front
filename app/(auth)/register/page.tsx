@@ -138,7 +138,8 @@ export default function RegisterPage() {
     try {
       const success = await register(formData)
       if (success) {
-        router.push("/dashboard/agents")
+        // Redirect is now handled by SessionProvider
+        console.log("✅ Registration successful. SessionProvider will handle redirect.")
       }
     } finally {
       setIsSubmitting(false)
@@ -266,7 +267,7 @@ export default function RegisterPage() {
 
             {activeTab === "subscription" && (
               <SubscriptionPlans
-                selectedPlan={formData.subscription}
+                selectedPlan={formData.subscription || "advanced"} // Provide default fallback
                 onPlanChange={handleSubscriptionChange}
                 billingCycle={billingCycle}
                 onBillingCycleChange={setBillingCycle}

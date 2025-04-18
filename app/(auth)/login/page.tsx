@@ -21,7 +21,7 @@ export default function LoginPage() {
   const { login } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const from = searchParams.get("from") || "/agents"
+  const from = searchParams.get("from") || "/dashboard/agents"
 
   // Ajouter un log au chargement de la page
   useEffect(() => {
@@ -72,12 +72,12 @@ export default function LoginPage() {
     console.log("⏳ Starting login process")
 
     try {
-      const success = await login(email, password)
+      const success = await login(email, password, from) // Pass the 'from' path
       console.log("🔑 Login result:", { success })
 
       if (success) {
-        console.log("✅ Login successful, redirecting to:", from)
-        router.push(from)
+        // Redirect is now handled by SessionProvider
+        console.log("✅ Login successful. SessionProvider will handle redirect.")
       } else {
         console.log("❌ Login failed but no error was thrown")
       }

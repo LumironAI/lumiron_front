@@ -1,16 +1,13 @@
-import { redirect } from "next/navigation"
-import { cookies } from "next/headers"
+// Remove server-side redirects based on outdated cookie checks.
+// Middleware now handles authentication redirects for the root path.
 
-export default async function Home() {
-  // Vérifier si l'utilisateur a un token d'authentification
-  const cookieStore = await cookies()
-  const authToken = cookieStore.get("auth-token")?.value
-
-  // Si l'utilisateur est déjà connecté, rediriger vers le tableau de bord
-  // Sinon, rediriger vers la page de login
-  if (authToken) {
-    redirect("/dashboard/agents")
-  } else {
-    redirect("/login")
-  }
+export default function Home() {
+  // This page will likely never be reached directly by users due to middleware redirects.
+  // Render minimal content or consider removing if not needed.
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <h1>Root Page</h1>
+      <p>Middleware should handle redirects.</p>
+    </main>
+  );
 }

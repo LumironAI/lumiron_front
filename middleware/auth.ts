@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import type { Session } from "@supabase/supabase-js" // Import Session type
 
 // Define protected routes that require authentication
 const protectedRoutes = ["/dashboard/agents", "/dashboard", "/dashboard/appels-entrants", "/dashboard/appels-sortants", "/dashboard/historique-entrants", "/dashboard/historique-sortants", "/dashboard/agents-sortants", "/dashboard/campagnes", "/dashboard/leads"]
@@ -6,12 +7,12 @@ const protectedRoutes = ["/dashboard/agents", "/dashboard", "/dashboard/appels-e
 // Define public routes that don't require authentication
 const publicRoutes = ["/login", "/register", "/forgot-password", "/reset-password"]
 
-export function authMiddleware(request: NextRequest) {
+// Update function signature to accept session
+export function authMiddleware(request: NextRequest, session: Session | null) {
   const { pathname } = request.nextUrl
 
-  // Check if the user has an auth token
-  const token = request.cookies.get("auth-token")?.value
-  const isAuthenticated = !!token
+  // Use the passed session object to determine authentication status
+  const isAuthenticated = !!session
 
   // Check if the route is protected
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
