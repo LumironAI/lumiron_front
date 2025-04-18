@@ -17,7 +17,7 @@ import { AgentCreationLayout } from "@/components/agent-creation/layout/agent-cr
 import { OpeningHoursRow } from "@/components/agent-creation/step2-informations/opening-hours-row"
 import { OptionToggle } from "@/components/agent-creation/step2-informations/option-toggle"
 import { FileUpload } from "@/components/agent-creation/step2-informations/file-upload"
-import { useAgentCreation } from "@/contexts/agent-creation-context"
+import { useAgentCreation, type AgentData } from "@/contexts/agent-creation-context"
 import { useToast } from "@/hooks/ui/use-toast"
 import { agentService } from "@/services/agent.service"
 
@@ -144,8 +144,11 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
               openingHours: data.openingHours || defaultOpeningHours,
               options: data.options || defaultOptions,
               foodOptions: data.foodOptions || defaultFoodOptions,
-              closureDays: data.closureDays || { enabled: false, dates: [] },
-              additionalInfo: data.additionalInfo || "",
+              additionalInfo: data.additionalinfo || "",
+              closureDays: {
+                enabled: data.closureDays?.enabled || false,
+                dates: (data.closureDays?.dates || []).map((d: string | Date) => typeof d === 'string' ? new Date(d) : d),
+              },
             }
 
             // Mettre à jour les états locaux
@@ -157,7 +160,22 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
             setClosureDates(updatedAgentData.closureDays.dates)
             setAdditionalInfo(updatedAgentData.additionalInfo)
 
-            updateAgentData(updatedAgentData)
+            // Update context ONLY with fields relevant to this step + identifiers
+            updateAgentData({
+              id: updatedAgentData.id,
+              name: updatedAgentData.name,
+              status: updatedAgentData.status,
+              sector: updatedAgentData.sector,
+              establishment: updatedAgentData.establishment,
+              website: updatedAgentData.website,
+              address: updatedAgentData.address,
+              city: updatedAgentData.city,
+              openingHours: updatedAgentData.openingHours,
+              options: updatedAgentData.options,
+              foodOptions: updatedAgentData.foodOptions,
+              closureDays: updatedAgentData.closureDays,
+              additionalInfo: updatedAgentData.additionalInfo,
+            })
             setAgentId(agentId)
           }
         }
@@ -272,58 +290,86 @@ export default function AgentInformationsPage({ params }: { params: Promise<{ id
   }
 
   const handleContinue = async () => {
-    if (!validateForm()) {
-      return
+    const isValid = validateForm();
+    console.log('[AgentInformationsPage] Validation result:', isValid); // Log pour débogage
+
+    if (!isValid) {
+      toast({ // Ajout d'un toast si la validation échoue
+        title: "Validation échouée",
+        description: "Veuillez vérifier les champs obligatoires marqués en rouge.",
+        variant: "destructive", // Utiliser 'destructive' car 'warning' n'est pas supporté
+      });
+      return;
     }
 
+    setIsLoading(true);
     try {
-      setIsLoading(true)
-      await saveFormData()
+      await saveFormData();
       toast({
         title: "Étape terminée",
         description: "Les informations ont été enregistrées",
         variant: "success",
-      })
-      router.push(`/dashboard/agents/${agentId}/configuration`)
+      });
+      router.push(`/dashboard/agents/${agentId}/configuration`);
     } catch (error) {
       toast({
         title: "Erreur",
         description: "Une erreur est survenue lors de la sauvegarde",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const saveFormData = async (asDraft = false) => {
-    // Save form data
-    const formData = {
+    // Préparer les données avec les NOMS DE COLONNES BDD
+    const formDataToSave: Record<string, any> = {
+      establishment,
+      website,
+      address,
+      city,
+      additionalinfo: additionalInfo,
+      openingHours: agentData.openingHours || defaultOpeningHours,
+      options: agentData.options || defaultOptions,
+      foodOptions: agentData.foodOptions || defaultFoodOptions,
+      closureDays: {
+        enabled: closureDaysEnabled,
+        dates: closureDates.map(date => date.toISOString()),
+      },
+      status: asDraft ? "draft" : agentData.status || "draft",
+    };
+
+    // Mettre à jour le contexte (utilise les noms de contexte)
+    updateAgentData({
+      ...agentData,
       establishment,
       website,
       address,
       city,
       additionalInfo,
+      openingHours: agentData.openingHours || defaultOpeningHours,
+      options: agentData.options || defaultOptions,
+      foodOptions: agentData.foodOptions || defaultFoodOptions,
       closureDays: {
         enabled: closureDaysEnabled,
-        dates: closureDates,
+        dates: closureDates
       },
-    }
+      status: asDraft ? "draft" : agentData.status || "draft",
+    });
 
-    // Update context
-    updateAgentData({
-      ...agentData,
-      ...formData,
-    })
-
-    // Save to API
-    if (agentId) {
-      await agentService.updateAgent(agentId, {
-        name: agentData.name,
-        status: asDraft ? "draft" : agentData.status || "draft",
-      })
+    // Sauvegarder en BDD (utilise l'objet avec les noms BDD)
+    try {
+      if (agentId) {
+        await agentService.updateAgent(agentId, formDataToSave);
+      } else {
+        console.warn("Agent ID not defined, cannot save to DB yet.");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde des informations:", error);
+      throw error;
     }
-  }
+  };
 
   const handleOpeningHoursChange = (day: string, period: "lunch" | "dinner", isOpen: boolean) => {
     const updatedOpeningHours = { ...agentData.openingHours }

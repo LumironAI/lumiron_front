@@ -2,6 +2,8 @@
 
 import { useRouter, useParams } from "next/navigation"
 import { useState, useEffect, use } from "react"
+import { format, differenceInDays, addDays } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { AgentCreationLayout } from "@/components/agent-creation/layout/agent-creation-layout"
 import { ActionButtons } from "@/components/agent-creation/common/action-buttons"
 import { InfoSummarySection } from "@/components/agent-creation/step4-recap/info-summary-section"
@@ -11,6 +13,7 @@ import { OptionsSummarySection } from "@/components/agent-creation/step4-recap/o
 import { VoiceSummarySection } from "@/components/agent-creation/step4-recap/voice-summary-section"
 import { IntegrationsSummarySection } from "@/components/agent-creation/step4-recap/integrations-summary-section"
 import { DocumentsSummarySection } from "@/components/agent-creation/step4-recap/documents-summary-section"
+import { ConfigSummarySection } from "@/components/agent-creation/step4-recap/config-summary-section"
 import { useAgentCreation } from "@/contexts/agent-creation-context"
 import { useToast } from "@/hooks/ui/use-toast"
 import { agentService } from "@/services/agent.service"
@@ -41,26 +44,32 @@ export default function AgentRecapPage({ params }: { params: Promise<{ id: strin
           const { data, error } = await agentService.getAgentById(agentId)
           if (data) {
             // Update context with loaded data without losing existing data
+            // Map snake_case from DB to camelCase for context
             updateAgentData({
               id: agentId,
               name: data.name,
               status: data.status,
-              // Conserver les autres propriétés telles que le secteur, les horaires, etc.
               sector: data.sector || agentData.sector,
               establishment: data.establishment || agentData.establishment,
               website: data.website || agentData.website,
               address: data.address || agentData.address,
               city: data.city || agentData.city,
-              phoneNumber: data.phoneNumber || agentData.phoneNumber,
-              deviceType: data.deviceType || agentData.deviceType,
+              phoneNumber: data.redirect_phone_number || agentData.phoneNumber,
+              deviceType: data.devicetype || agentData.deviceType,
               voiceGender: data.voiceGender || agentData.voiceGender,
               voiceType: data.voiceType || agentData.voiceType,
+              voice_profile_id: data.voice_profile_id || agentData.voice_profile_id,
+              transferPhone: data.transfer_phone || agentData.transferPhone,
+              configOptions: data.config_options || agentData.configOptions,
               openingHours: data.openingHours || agentData.openingHours,
               options: data.options || agentData.options,
               foodOptions: data.foodOptions || agentData.foodOptions,
-              closureDays: data.closureDays || agentData.closureDays,
-              additionalInfo: data.additionalInfo || agentData.additionalInfo,
-              documents: data.documents || agentData.documents,
+              closureDays: {
+                enabled: data.closureDays?.enabled || agentData.closureDays?.enabled || false,
+                dates: (data.closureDays?.dates || agentData.closureDays?.dates || []).map((d: string | Date) => typeof d === 'string' ? new Date(d) : d),
+              },
+              additionalInfo: data.additionalinfo || agentData.additionalInfo,
+              documents: data.document_urls || agentData.documents,
               integrations: data.integrations || agentData.integrations,
             })
             setAgentId(agentId)
@@ -113,10 +122,34 @@ export default function AgentRecapPage({ params }: { params: Promise<{ id: strin
   const handleCreateAgent = async () => {
     try {
       setIsLoading(true)
-      await agentService.updateAgent(agentId, {
-        name: agentData.name,
-        status: "active",
-      })
+      // Préparer l'objet final avec les NOMS DE COLONNES BDD
+      const finalAgentDataDB: Record<string, any> = {
+        ...agentData, // Commencer avec les données du contexte
+        status: "active", // Définir le statut final
+        redirect_phone_number: agentData.phoneNumber,
+        document_urls: agentData.documents,
+        // Ajouter les autres remappages de casse
+        additionalinfo: agentData.additionalInfo,
+        devicetype: agentData.deviceType,
+        voice_profile_id: agentData.voice_profile_id,
+        transfer_phone: agentData.transferPhone,
+        config_options: agentData.configOptions,
+        openingHours: agentData.openingHours,
+        options: agentData.options,
+      };
+      // Supprimer les clés qui n'existent pas dans la BDD ou qui viennent du contexte
+      delete finalAgentDataDB.phoneNumber;
+      delete finalAgentDataDB.documents;
+      delete finalAgentDataDB.additionalInfo; // Supprimer ancienne clé
+      delete finalAgentDataDB.deviceType; // Supprimer ancienne clé
+      delete finalAgentDataDB.voiceGender; // Explicitly remove context key
+      delete finalAgentDataDB.voiceType;  // Explicitly remove context key
+      delete finalAgentDataDB.transferPhone;
+      delete finalAgentDataDB.configOptions;
+      // Supprimer d'autres clés potentiellement non mappées si elles existent dans AgentData
+      // delete finalAgentDataDB.someContextOnlyKey;
+
+      await agentService.updateAgent(agentId, finalAgentDataDB)
 
       toast({
         title: "Agent créé avec succès",
@@ -136,24 +169,48 @@ export default function AgentRecapPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  // Convertir les dates de fermeture en périodes uniquement si l'option est activée
-  const closurePeriods =
-    agentData.closureDays?.enabled && agentData.closureDays?.dates?.length > 0
-      ? [
-          {
-            start: "07/04/2025",
-            end: "13/04/2025",
-          },
-          {
-            start: "10/09/2025",
-            end: "01/10/2025",
-          },
-          {
-            start: "10/01/2026",
-            end: "10/02/2026",
-          },
-        ]
-      : []
+  // **Correction: Convertir les dates de fermeture réelles en périodes**
+  const calculateClosurePeriods = () => {
+    if (!agentData.closureDays?.enabled || !agentData.closureDays.dates || agentData.closureDays.dates.length === 0) {
+      return [];
+    }
+
+    const dates = agentData.closureDays.dates
+      .map(d => new Date(d)) // S'assurer que ce sont des objets Date
+      .sort((a, b) => a.getTime() - b.getTime()); // Trier les dates
+
+    if (dates.length === 0) return [];
+
+    const periods = [];
+    let periodStart = dates[0];
+    let periodEnd = dates[0];
+
+    for (let i = 1; i < dates.length; i++) {
+      // Vérifier si la date actuelle est le jour suivant la date de fin de période en cours
+      if (differenceInDays(dates[i], periodEnd) === 1) {
+        // Si oui, étendre la période
+        periodEnd = dates[i];
+      } else {
+        // Si non, finaliser la période précédente et commencer une nouvelle
+        periods.push({
+          start: format(periodStart, 'dd/MM/yyyy', { locale: fr }),
+          end: format(periodEnd, 'dd/MM/yyyy', { locale: fr }),
+        });
+        periodStart = dates[i];
+        periodEnd = dates[i];
+      }
+    }
+
+    // Ajouter la dernière période
+    periods.push({
+      start: format(periodStart, 'dd/MM/yyyy', { locale: fr }),
+      end: format(periodEnd, 'dd/MM/yyyy', { locale: fr }),
+    });
+
+    return periods;
+  };
+
+  const closurePeriods = calculateClosurePeriods();
 
   // Filtrer les intégrations activées
   const enabledIntegrations = agentData.integrations?.filter((integration) => integration.enabled) || []
@@ -169,8 +226,8 @@ export default function AgentRecapPage({ params }: { params: Promise<{ id: strin
   return (
     <AgentCreationLayout agentId={agentId} activeTab="recapitulatif">
       <InfoSummarySection
-        agentName={agentData.name}
-        sector={agentData.sector}
+        agentName={agentData.name || ""}
+        sector={agentData.sector || ""}
         establishment={agentData.establishment}
         website={agentData.website}
         address={agentData.address}
@@ -189,6 +246,11 @@ export default function AgentRecapPage({ params }: { params: Promise<{ id: strin
       <VoiceSummarySection
         gender={agentData.voiceGender ? (agentData.voiceGender as "homme" | "femme") : "homme"}
         voiceType={agentData.voiceType ? (agentData.voiceType as "enthousiaste" | "professionnelle") : "professionnelle"}
+      />
+
+      <ConfigSummarySection
+        transferPhone={agentData.transferPhone}
+        configOptions={agentData.configOptions}
       />
 
       <IntegrationsSummarySection integrations={enabledIntegrations} />

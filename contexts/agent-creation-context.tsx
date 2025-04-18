@@ -1,7 +1,15 @@
 "use client"
 
-import { createContext, useContext, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useCallback, type ReactNode, useState, useEffect } from "react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { agentService } from "@/services/agent.service"
+
+// Type pour un profil vocal simplifié
+export interface VoiceProfile {
+  id: number
+  voice_identifier: string
+  display_name: string
+}
 
 // Types pour les données de l'agent
 export interface AgentData {
@@ -17,6 +25,7 @@ export interface AgentData {
   deviceType?: string
   voiceGender?: string
   voiceType?: string
+  voice_profile_id?: number
   transferPhone?: string
   configOptions?: {
     id: string
@@ -113,6 +122,7 @@ const defaultAgentData: AgentData = {
   deviceType: "apple",
   voiceGender: "homme",
   voiceType: "enthousiaste",
+  voice_profile_id: undefined,
   transferPhone: "",
   documents: [],
   additionalInfo: "",
@@ -121,6 +131,7 @@ const defaultAgentData: AgentData = {
 // Type pour le contexte
 interface AgentCreationContextType {
   agentData: AgentData
+  voiceProfiles: VoiceProfile[]
   updateAgentData: (data: Partial<AgentData>) => void
   resetAgentData: () => void
   setAgentId: (id: string) => void
@@ -141,6 +152,21 @@ export function useAgentCreation() {
 // Provider du contexte
 export function AgentCreationProvider({ children }: { children: ReactNode }) {
   const [agentData, setAgentData] = useLocalStorage<AgentData>("agent-creation-data", defaultAgentData)
+  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>([])
+
+  // Charger les profils vocaux au montage
+  useEffect(() => {
+    async function loadVoiceProfiles() {
+      try {
+        const profiles = await agentService.getVoiceProfiles()
+        setVoiceProfiles(profiles)
+      } catch (error) {
+        console.error("Failed to load voice profiles:", error)
+        // Gérer l'erreur si nécessaire (ex: toast)
+      }
+    }
+    loadVoiceProfiles()
+  }, []) // Le tableau vide assure que cela ne s'exécute qu'une fois
 
   // Utiliser useCallback pour éviter de recréer cette fonction à chaque rendu
   const updateAgentData = useCallback(
@@ -173,7 +199,7 @@ export function AgentCreationProvider({ children }: { children: ReactNode }) {
   )
 
   return (
-    <AgentCreationContext.Provider value={{ agentData, updateAgentData, resetAgentData, setAgentId }}>
+    <AgentCreationContext.Provider value={{ agentData, voiceProfiles, updateAgentData, resetAgentData, setAgentId }}>
       {children}
     </AgentCreationContext.Provider>
   )

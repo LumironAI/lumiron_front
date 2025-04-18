@@ -2,28 +2,28 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter, useParams } from "next/navigation" 
-import { Phone, Volume2, UserPlus, Settings, Database, VolumeX, VolumeUp, VolumeUp2, ArrowUp, ArrowDown } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Phone, Volume2, UserPlus, Settings, Database, Volume } from "lucide-react"
+import { PhoneNumberSection } from "@/components/agent-creation/step3-configuration/phone-number-section"
+import { VoiceSection } from "@/components/agent-creation/step3-configuration/voice-section"
+import { TransferSection } from "@/components/agent-creation/step3-configuration/transfer-section"
+import { OptionsSection } from "@/components/agent-creation/step3-configuration/options-section"
+import { IntegrationsSection } from "@/components/agent-creation/step3-configuration/integrations-section"
 import { AgentCreationLayout } from "@/components/agent-creation/layout/agent-creation-layout"
-import { useAgentCreation } from "@/contexts/agent-creation-context"
+import { useAgentCreation, type VoiceProfile, type AgentData } from "@/contexts/agent-creation-context"
 import { useToast } from "@/hooks/ui/use-toast"
 import { agentService } from "@/services/agent.service"
 import { ActionButtons } from "@/components/agent-creation/common/action-buttons"
-import { SectionCard } from "@/components/agent-creation/common/section-card"
-import { FormRow } from "@/components/agent-creation/common/form-row"
 
 export default function AgentConfigurationPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const routeParams = useParams() 
   const unwrappedParams = use(params)
   const agentId = unwrappedParams.id || (routeParams?.id as string)
-  const { agentData, updateAgentData, setAgentId } = useAgentCreation()
+  const { agentData, voiceProfiles, updateAgentData, setAgentId } = useAgentCreation()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [isAgentLoaded, setIsAgentLoaded] = useState(false)
 
   // États pour les différentes sections
   const [phoneNumber, setPhoneNumber] = useState(agentData.phoneNumber || "+33 6 12 34 56 78")
@@ -35,48 +35,62 @@ export default function AgentConfigurationPage({ params }: { params: Promise<{ i
     (agentData.voiceType as "enthousiaste" | "professionnelle") || "enthousiaste",
   )
   const [transferPhone, setTransferPhone] = useState(agentData.transferPhone || "")
-  const [voiceExamples, setVoiceExamples] = useState<string[]>(agentData.voiceExamples || [])
-  const [options, setOptions] = useState<{ id: string; label: string; description?: string; enabled: boolean }[]>([
-    { id: "sms", label: "SMS", description: "Activer l'envoi de SMS (0.15 centimes / SMS)", enabled: false },
-    { id: "autres", label: "Autres", enabled: false },
-  ])
-  const [integrations, setIntegrations] = useState([
-    {
-      id: "thefork",
-      name: "TheFork",
-      enabled: false,
-      description: "Connecter votre compte",
-      fields: [
-        { id: "site_name", label: "Nom du site", value: "" },
-        { id: "site_id", label: "ID du site", value: "" },
-        { id: "account_id", label: "ID du compte", value: "" },
-        { id: "restaurant_id", label: "ID restaurant", value: "" },
-        { id: "api_key", label: "Clé API", value: "********" },
-      ],
-    },
-    {
-      id: "zenchef",
-      name: "ZenChef",
-      enabled: false,
-      description: "Connecter votre compte",
-      fields: [
-        { id: "site_name", label: "Nom du site", value: "" },
-        { id: "site_id", label: "ID du site", value: "" },
-        { id: "account_id", label: "ID du compte", value: "" },
-        { id: "restaurant_id", label: "ID restaurant", value: "" },
-        { id: "api_key", label: "Clé API", value: "********" },
-      ],
-    },
-    { id: "sevenrooms", name: "SevenRooms", enabled: false, description: "Connecter votre compte" },
-    { id: "custom", name: "Système personnalisé", enabled: false, description: "Connecter votre compte" },
+  const [options, setOptions] = useState<{ id: string; label: string; description?: string; enabled: boolean }[]>(
+    agentData.configOptions || [
+      { id: "sms", label: "SMS", description: "Activer l'envoi de SMS (0.15 centimes / SMS)", enabled: false },
+      { id: "autres", label: "Autres", enabled: false },
+    ]
+  )
+  const [integrations, setIntegrations] = useState(
+    agentData.integrations || [
+      {
+        id: "thefork",
+        name: "TheFork",
+        enabled: false,
+        description: "Connecter votre compte",
+        fields: [
+          { id: "site_name", label: "Nom du site", value: "" },
+          { id: "site_id", label: "ID du site", value: "" },
+          { id: "account_id", label: "ID du compte", value: "" },
+          { id: "restaurant_id", label: "ID restaurant", value: "" },
+          { id: "api_key", label: "Clé API", value: "********" },
+        ],
+      },
+      {
+        id: "zenchef",
+        name: "ZenChef",
+        enabled: false,
+        description: "Connecter votre compte",
+        fields: [
+          { id: "site_name", label: "Nom du site", value: "" },
+          { id: "site_id", label: "ID du site", value: "" },
+          { id: "account_id", label: "ID du compte", value: "" },
+          { id: "restaurant_id", label: "ID restaurant", value: "" },
+          { id: "api_key", label: "Clé API", value: "********" },
+        ],
+      },
+      { id: "sevenrooms", name: "SevenRooms", enabled: false, description: "Connecter votre compte" },
+      { id: "custom", name: "Système personnalisé", enabled: false, description: "Connecter votre compte" },
+    ]
+  )
+  const [transferExamples, setTransferExamples] = useState([
+    { id: "1", enabled: false, label: "Exemple 1" },
+    { id: "2", enabled: false, label: "Exemple 2" },
+    { id: "3", enabled: false, label: "Exemple 3" },
   ])
 
   // Load agent data if we have an ID
   useEffect(() => {
+    // Éviter de charger l'agent plus d'une fois
+    if (isAgentLoaded) {
+      return;
+    }
+    
     async function loadAgentData() {
       try {
         if (agentId) {
           setIsInitializing(true)
+          setIsAgentLoaded(true)
           const { data, error } = await agentService.getAgentById(agentId)
 
           if (error) {
@@ -84,21 +98,48 @@ export default function AgentConfigurationPage({ params }: { params: Promise<{ i
           }
 
           if (data) {
-            // Update context with loaded data
-            const agentData = {
+            // Map snake_case from DB to camelCase for context
+            const updatedData = {
               id: data.id.toString(),
               name: data.name,
               status: data.status,
-              voiceGender: data.voiceGender || "homme",
-              voiceType: data.voiceType || "professionnelle",
+              phoneNumber: data.redirect_phone_number || phoneNumber, // Map redirect_phone_number to phoneNumber
+              deviceType: data.devicetype || deviceType,             // Map devicetype to deviceType
+              voiceGender: data.voiceGender || gender,
+              voiceType: data.voiceType || voiceType,
+              voice_profile_id: data.voice_profile_id,
+              transferPhone: data.transfer_phone || transferPhone,    // Map transfer_phone to transferPhone
+              configOptions: data.config_options || options,       // Map config_options to configOptions
+              integrations: data.integrations || integrations,
+              // Include necessary fields from previous steps read from DB
+              sector: data.sector,
+              establishment: data.establishment,
+              website: data.website,
+              address: data.address,
+              city: data.city,
+              openingHours: data.openingHours,
+              closureDays: {
+                enabled: data.closureDays?.enabled || false,
+                dates: (data.closureDays?.dates || []).map((d: string | Date) => typeof d === 'string' ? new Date(d) : d),
+              },
+              options: data.options, // General options
+              foodOptions: data.foodOptions,
+              additionalinfo: data.additionalinfo, // Map additionalinfo
+              documents: data.document_urls || [], // Map document_urls
             }
 
-            updateAgentData(agentData)
+            // Mettre à jour le contexte avec TOUTES les données mappées
+            updateAgentData(updatedData)
             setAgentId(agentId)
 
-            // Update local state
-            setGender(data.voiceGender || "homme")
-            setVoiceType(data.voiceType || "professionnelle")
+            // Mettre à jour les états locaux (utilisent camelCase ou noms locaux)
+            if (updatedData.phoneNumber) setPhoneNumber(updatedData.phoneNumber)
+            if (updatedData.deviceType) setDeviceType(updatedData.deviceType as "apple" | "autres")
+            if (updatedData.voiceGender) setGender(updatedData.voiceGender as "homme" | "femme")
+            if (updatedData.voiceType) setVoiceType(updatedData.voiceType as "enthousiaste" | "professionnelle")
+            if (updatedData.transferPhone) setTransferPhone(updatedData.transferPhone)
+            if (updatedData.configOptions) setOptions(updatedData.configOptions)
+            if (updatedData.integrations) setIntegrations(updatedData.integrations)
           }
         }
       } catch (error) {
@@ -114,14 +155,37 @@ export default function AgentConfigurationPage({ params }: { params: Promise<{ i
     }
 
     loadAgentData()
-  }, [agentId, updateAgentData, setAgentId, toast])
+  }, [agentId, updateAgentData, setAgentId, toast, isAgentLoaded])
+
+  // **Nouveau useEffect pour déterminer voice_profile_id**
+  useEffect(() => {
+    if (voiceProfiles.length > 0 && gender && voiceType) {
+      let targetDisplayName = ""
+      if (gender === "femme") {
+        targetDisplayName = voiceType === "enthousiaste" ? "Stephanie - Enthousiaste" : "Sandrine - Professionnelle"
+      } else { // homme
+        targetDisplayName = voiceType === "enthousiaste" ? "Antoine - Enthousiaste" : "Jean - Professionnelle" // Assurez-vous que ce nom correspond exactement à celui dans la DB
+      }
+
+      const foundProfile = voiceProfiles.find((p) => p.display_name === targetDisplayName)
+
+      if (foundProfile && agentData.voice_profile_id !== foundProfile.id) {
+        // Mettre à jour le contexte SEULEMENT si l'ID a changé
+        updateAgentData({ voice_profile_id: foundProfile.id })
+      } else if (!foundProfile) {
+        console.warn(`Voice profile not found for display name: ${targetDisplayName}`)
+        // Optionnel: réinitialiser l'ID si aucun profil ne correspond ?
+        // updateAgentData({ voice_profile_id: undefined })
+      }
+    }
+  }, [gender, voiceType, voiceProfiles, updateAgentData, agentData.voice_profile_id]) // Dépendances: selections utilisateur et liste chargée
 
   // Gestionnaires d'événements
   const handlePrevious = async () => {
     try {
       setIsLoading(true)
       await saveData()
-      router.push(`/agents/${agentId}/informations`)
+      router.push(`/dashboard/agents/${agentId}/informations`)
     } catch (error) {
       toast({
         title: "Erreur",
@@ -142,7 +206,7 @@ export default function AgentConfigurationPage({ params }: { params: Promise<{ i
         description: "Votre agent a été sauvegardé comme brouillon",
         variant: "success",
       })
-      router.push("/agents")
+      router.push("/dashboard/agents")
     } catch (error) {
       toast({
         title: "Erreur",
@@ -163,7 +227,7 @@ export default function AgentConfigurationPage({ params }: { params: Promise<{ i
         description: "Passons à l'étape suivante",
         variant: "success",
       })
-      router.push(`/agents/${agentId}/recapitulatif`)
+      router.push(`/dashboard/agents/${agentId}/recapitulatif`)
     } catch (error) {
       toast({
         title: "Erreur",
@@ -176,66 +240,78 @@ export default function AgentConfigurationPage({ params }: { params: Promise<{ i
   }
 
   const saveData = async (asDraft = false) => {
-    // Mise à jour du contexte local
-    const updatedData = {
-      phoneNumber,
-      deviceType,
-      voiceGender,
-      voiceType,
-      transferPhone,
+    // Préparer les données avec les NOMS DE COLONNES BDD
+    const dataToSend: Record<string, any> = {
+      name: agentData.name,
+      status: asDraft ? "draft" : agentData.status || "draft",
+      redirect_phone_number: phoneNumber,
+      devicetype: deviceType,
+      voice_profile_id: agentData.voice_profile_id,
+      transfer_phone: transferPhone,
+      config_options: options,
+      integrations: integrations,
+      sector: agentData.sector,
+      establishment: agentData.establishment,
+      website: agentData.website,
+      address: agentData.address,
+      city: agentData.city,
+      openingHours: agentData.openingHours,
+      closureDays: agentData.closureDays,
+      options: agentData.options,           // This is the options object for establishment features (PMR, Terrasse etc)
+      foodOptions: agentData.foodOptions,
+      additionalinfo: agentData.additionalInfo, // Use DB column name (lowercase i)
+      document_urls: agentData.documents, // <- Nom BDD
+    };
+
+    // Mettre à jour le contexte (utilise les noms de contexte)
+    updateAgentData({
+      // Ici on peut garder les noms de contexte pour la mise à jour locale
+      phoneNumber: phoneNumber, // Met à jour le 'phoneNumber' du contexte
+      deviceType: deviceType, // <- GARDER camelCase ici pour le contexte
+      voice_profile_id: agentData.voice_profile_id,
+      transferPhone: transferPhone,
       configOptions: options,
-      integrations: integrations.filter((i) => i.enabled),
-    }
+      integrations: integrations,
+      // Les autres champs sont déjà dans agentData
+      status: asDraft ? "draft" : agentData.status || "draft",
+    });
 
-    updateAgentData(updatedData)
-
-    // Envoi au backend - only update the name and status in the database
+    // Envoi au backend (utilise l'objet avec les noms BDD)
     try {
-      if (asDraft) {
-        await agentService.saveAgentDraft({
-          id: agentId,
-          name: agentData.name,
-          status: "draft",
-        })
-      } else {
-        // Mise à jour d'un agent existant - only basic fields
-        await agentService.updateAgent(agentId, {
-          name: agentData.name,
-          status: "draft",
-        })
-      }
+      await agentService.updateAgent(agentId, dataToSend);
     } catch (error) {
-      console.error("Erreur lors de la sauvegarde:", error)
-      throw error
+      console.error("Erreur lors de la sauvegarde:", error);
+      throw error;
     }
+  };
+
+  // Event handlers pour les composants
+  const handlePhoneNumberChange = (value: string) => {
+    setPhoneNumber(value)
   }
 
-  const toggleIntegration = (id: string) => {
-    setIntegrations((prev) =>
-      prev.map((integration) =>
-        integration.id === id ? { ...integration, enabled: !integration.enabled } : integration,
-      ),
-    )
+  const handleDeviceTypeChange = (value: "apple" | "autres") => {
+    setDeviceType(value)
   }
 
-  const updateIntegrationField = (integrationId: string, fieldId: string, value: string) => {
-    setIntegrations((prev) =>
-      prev.map((integration) =>
-        integration.id === integrationId && integration.fields
-          ? {
-              ...integration,
-              fields: integration.fields.map((field) => (field.id === fieldId ? { ...field, value } : field)),
-            }
-          : integration,
-      ),
-    )
+  const handleGenderChange = (value: "homme" | "femme") => {
+    setGender(value)
   }
 
-  const toggleExample = (id: string) => {
-    const updatedExamples = voiceExamples.includes(id)
-      ? voiceExamples.filter((exId) => exId !== id)
-      : [...voiceExamples, id]
-    setVoiceExamples(updatedExamples)
+  const handleVoiceTypeChange = (value: "enthousiaste" | "professionnelle") => {
+    setVoiceType(value)
+  }
+
+  const handleTransferPhoneChange = (value: string) => {
+    setTransferPhone(value)
+  }
+
+  const handleOptionsChange = (updatedOptions: typeof options) => {
+    setOptions(updatedOptions)
+  }
+
+  const handleIntegrationsChange = (updatedIntegrations: typeof integrations) => {
+    setIntegrations(updatedIntegrations)
   }
 
   if (isInitializing) {
@@ -248,222 +324,40 @@ export default function AgentConfigurationPage({ params }: { params: Promise<{ i
 
   return (
     <AgentCreationLayout agentId={agentId} activeTab="configuration">
-      {/* Section Numéro de téléphone */}
-      <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-full bg-green-100">
-            <Phone className="h-5 w-5 text-foreground" />
-          </div>
-          <h3 className="font-medium text-lg">Votre numéro de téléphone :</h3>
-        </div>
+      {/* Numéro de téléphone */}
+      <PhoneNumberSection 
+        initialPhoneNumber={phoneNumber}
+        initialDeviceType={deviceType}
+        onPhoneNumberChange={handlePhoneNumberChange}
+        onDeviceTypeChange={handleDeviceTypeChange}
+      />
 
-        <div className="flex items-center gap-2 mb-4">
-          <div className="bg-gray-50 p-3 rounded-md border border-gray-200 text-sm">{phoneNumber}</div>
-        </div>
+      {/* Voix de l'agent */}
+      <VoiceSection
+        initialGender={gender}
+        initialVoiceType={voiceType}
+        onGenderChange={handleGenderChange}
+        onVoiceTypeChange={handleVoiceTypeChange}
+      />
 
-        <p className="text-sm text-gray-500 mb-4">
-          Pour transférer votre numéro, veuillez remplir les informations ci-dessous en fonction de votre type
-          d'appareil
-        </p>
+      {/* Transfert d'appel */}
+      <TransferSection
+        initialPhoneNumber={transferPhone}
+        initialExamples={transferExamples}
+        onPhoneNumberChange={handleTransferPhoneChange}
+      />
 
-        <div className="flex gap-8 mb-6">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              checked={deviceType === "apple"}
-              onChange={() => setDeviceType("apple")}
-              className="form-radio h-4 w-4 text-primary"
-            />
-            <span>Apple</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              checked={deviceType === "autres"}
-              onChange={() => setDeviceType("autres")}
-              className="form-radio h-4 w-4 text-primary"
-            />
-            <span>Autres</span>
-          </label>
-        </div>
+      {/* Options */}
+      <OptionsSection
+        initialOptions={options}
+        onOptionsChange={handleOptionsChange}
+      />
 
-        {deviceType === "autres" && (
-          <div className="bg-gray-100 p-4 rounded-md">
-            <h4 className="font-medium mb-2">Comment transférer votre numéro :</h4>
-            <ol className="list-decimal pl-5 space-y-2 text-sm">
-              <li>Ouvrez l'application Téléphone sur votre appareil</li>
-              <li>Accédez au clavier de numérotation</li>
-              <li>Composez la commande suivante :</li>
-              <div className="bg-white p-2 rounded my-1 text-center">
-                <code>*21*{phoneNumber}</code>
-              </div>
-              <li>Appuyez sur le bouton d'appel</li>
-            </ol>
-          </div>
-        )}
-      </div>
-
-      {/* Section Voix de l'agent */}
-      <SectionCard
-        icon={<VolumeUp className="h-5 w-5" />}
-        title="Voix de l'agent"
-        iconColor="bg-icon-voice"
-      >
-        <FormRow label="Genre">
-          <Select value={gender} onValueChange={(value: "homme" | "femme") => setGender(value)}>
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder="Sélectionnez un genre" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="homme">Homme</SelectItem>
-              <SelectItem value="femme">Femme</SelectItem>
-            </SelectContent>
-          </Select>
-        </FormRow>
-
-        <FormRow label="Type de voix">
-          <Select
-            value={voiceType}
-            onValueChange={(value: "enthousiaste" | "professionnelle") => setVoiceType(value)}
-          >
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder="Sélectionnez un type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="professionnelle">Professionnelle</SelectItem>
-              <SelectItem value="enthousiaste">Enthousiaste</SelectItem>
-            </SelectContent>
-          </Select>
-        </FormRow>
-
-        <FormRow label="Exemples de voix">
-          <div className="space-y-2 w-full">
-            {voiceExamples.map((example) => (
-              <div
-                key={example}
-                className="flex items-center justify-between p-3 border rounded-md hover:bg-accent cursor-pointer"
-                onClick={() => toggleExample(example)}
-              >
-                <div className="flex items-center space-x-3">
-                  <VolumeUp2 className="h-5 w-5 text-primary" />
-                  <span>{example}</span>
-                </div>
-                <Switch checked={voiceExamples.includes(example)} />
-              </div>
-            ))}
-          </div>
-        </FormRow>
-      </SectionCard>
-
-      {/* Section Transfert d'appel */}
-      <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-full bg-orange-100">
-            <UserPlus className="h-5 w-5 text-foreground" />
-          </div>
-          <h3 className="font-medium text-lg">Transfert d'appel à un humain</h3>
-        </div>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">Rentrer votre numéro de téléphone :</label>
-          <div className="flex items-center">
-            <div className="relative flex-shrink-0">
-              <button className="flex items-center justify-between h-10 px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none">
-                <span>FR +33</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="ml-1 h-4 w-4 opacity-50"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
-            </div>
-            <Input
-              value={transferPhone}
-              onChange={(e) => setTransferPhone(e.target.value)}
-              placeholder="6 12 34 56 78"
-              className="flex-1 ml-2"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Section Options */}
-      <SectionCard
-        icon={<Settings className="h-5 w-5" />}
-        title="Options"
-        iconColor="bg-icon-settings"
-      >
-        <div className="space-y-4">
-          {options.map((option) => (
-            <div key={option.id} className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">{option.label}</div>
-                {option.description && <div className="text-sm text-gray-500">{option.description}</div>}
-              </div>
-              <Switch
-                checked={option.enabled}
-                onCheckedChange={(checked) => {
-                  setOptions((prev) => prev.map((opt) => (opt.id === option.id ? { ...opt, enabled: checked } : opt)))
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Section Intégrations */}
-      <SectionCard
-        icon={<Database className="h-5 w-5" />}
-        title="Intégrations"
-        iconColor="bg-icon-database"
-      >
-        <div className="space-y-6">
-          {integrations.map((integration) => (
-            <div key={integration.id} className="border-b pb-4 last:border-0 last:pb-0">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-                    {integration.id === "thefork" && <span className="text-xs font-bold">T</span>}
-                    {integration.id === "zenchef" && <span className="text-xs font-bold">Z</span>}
-                    {integration.id === "sevenrooms" && <span className="text-xs font-bold">S</span>}
-                    {integration.id === "custom" && <span className="text-xs font-bold">C</span>}
-                  </div>
-                  <div>
-                    <div className="font-medium">{integration.name}</div>
-                    <div className="text-xs text-gray-500">{integration.description}</div>
-                  </div>
-                </div>
-                <Switch checked={integration.enabled} onCheckedChange={() => toggleIntegration(integration.id)} />
-              </div>
-
-              {integration.enabled && integration.fields && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pl-8">
-                  {integration.fields.map((field) => (
-                    <div key={field.id}>
-                      <label className="block text-xs font-medium mb-1">{field.label}</label>
-                      <Input
-                        value={field.value}
-                        onChange={(e) => updateIntegrationField(integration.id, field.id, e.target.value)}
-                        className="text-sm"
-                        type={field.id === "api_key" ? "password" : "text"}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </SectionCard>
+      {/* Intégrations */}
+      <IntegrationsSection
+        initialIntegrations={integrations}
+        onIntegrationsChange={handleIntegrationsChange}
+      />
 
       {/* Boutons d'action */}
       <ActionButtons

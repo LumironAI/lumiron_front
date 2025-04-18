@@ -1,5 +1,6 @@
 import { Clock } from "lucide-react"
 import { SectionCard } from "@/components/agent-creation/common/section-card"
+import React from "react"
 
 interface OpeningHours {
   [day: string]: {
@@ -23,7 +24,7 @@ export function HoursSummarySection({ openingHours }: HoursSummaryProps) {
 
         {openingHours &&
           Object.entries(openingHours).map(([day, periods]) => (
-            <>
+            <React.Fragment key={day}>
               <div key={`${day}-day`} className="py-2">
                 {day}
               </div>
@@ -34,7 +35,7 @@ export function HoursSummarySection({ openingHours }: HoursSummaryProps) {
                 {periods.dinner.open ? `${periods.dinner.start} - ${periods.dinner.end}` : "Fermé"}
               </div>
               <div key={`${day}-spacer`}></div>
-            </>
+            </React.Fragment>
           ))}
       </div>
     </SectionCard>
