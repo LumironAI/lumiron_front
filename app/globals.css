@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 33% 98%; /* #f4f9ff */
+  --foreground: 222 47% 11%; /* #181d27 */
+
+  --card: 0 0% 100%; /* #ffffff */
+  --card-foreground: 222 47% 11%; /* #181d27 */
+
+  --popover: 0 0% 100%; /* #ffffff */
+  --popover-foreground: 222 47% 11%; /* #181d27 */
+
+  --primary: 210 91% 57%; /* #2c90f6 */
+  --primary-foreground: 0 0% 100%; /* #ffffff */
+
+  --secondary: 210 33% 93%; /* #daebff */
+  --secondary-foreground: 222 47% 11%; /* #181d27 */
+
+  --muted: 220 14% 96%; /* #f1f5f9 */
+  --muted-foreground: 220 9% 46%; /* #6b7280 */
+
+  --accent: 210 33% 93%; /* #daebff */
+  --accent-foreground: 222 47% 11%; /* #181d27 */
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%; /* #ffffff */
+
+  --border: 220 13% 91%; /* #e5e7eb */
+  --input: 220 13% 91%; /* #e5e7eb */
+  --ring: 210 91% 57%; /* #2c90f6 */
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 222 47% 11%; /* #181d27 - slightly darker background */
+  --foreground: 210 40% 98%; /* #f0f8ff - slightly blue-tinted white for better readability */
+
+  --card: 223 47% 15%; /* #1e2534 - slightly lighter than background */
+  --card-foreground: 210 40% 98%; /* #f0f8ff - matching foreground */
+
+  --popover: 223 47% 15%; /* #1e2534 - matching card */
+  --popover-foreground: 210 40% 98%; /* #f0f8ff - matching foreground */
+
+  --primary: 210 91% 65%; /* #4da3f8 - brighter primary for dark mode */
+  --primary-foreground: 0 0% 100%; /* #ffffff - pure white for contrast */
+
+  --secondary: 217 33% 20%; /* #293347 - slightly lighter than before */
+  --secondary-foreground: 210 40% 98%; /* #f0f8ff - matching foreground */
+
+  --muted: 217 33% 20%; /* #293347 - matching secondary */
+  --muted-foreground: 215 20% 75%; /* #b8c4d9 - lighter muted text for better contrast */
+
+  --accent: 215 30% 25%; /* #2d3b56 - distinct from secondary, slightly bluer */
+  --accent-foreground: 210 40% 98%; /* #f0f8ff - matching foreground */
+
+  --destructive: 0 84% 65%; /* #ff5a5a - brighter destructive for dark mode */
+  --destructive-foreground: 0 0% 100%; /* #ffffff - pure white */
+
+  --border: 217 33% 25%; /* #303e5c - lighter border for visibility */
+  --input: 217 33% 25%; /* #303e5c - matching border */
+  --ring: 210 91% 65%; /* #4da3f8 - matching primary */
+
+  /* Update icon colors for dark mode with better contrast */
+  --icon-calendar: 15 100% 65%; /* brighter orange-red */
+  --icon-clock: 142 70% 50%; /* brighter green */
+  --icon-settings: 270 70% 65%; /* brighter purple */
+  --icon-document: 210 100% 65%; /* brighter blue */
+  --icon-info: 40 100% 65%; /* brighter amber */
+}
+
+/* Add hover state styles for dark mode */
+.dark .hover\:bg-secondary:hover {
+  background-color: hsl(217 33% 28%); /* #364563 - noticeably lighter than secondary */
+}
+
+.dark .hover\:text-foreground:hover {
+  color: hsl(0 0% 100%); /* #ffffff - pure white for maximum contrast on hover */
+}
+
+/* Improve transition for theme changes */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+
+  /* Add smooth transitions for hover states */
+  a,
+  button {
+    @apply transition-colors duration-200;
+  }
+}
