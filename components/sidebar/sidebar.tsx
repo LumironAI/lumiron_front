@@ -77,10 +77,10 @@ export function Sidebar() {
 
           {/* Appels entrants */}
           <Link
-            href="/appels-entrants"
+            href="/dashboard/appels-entrants"
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-1",
-              pathname === "/appels-entrants"
+              pathname === "/dashboard/appels-entrants"
                 ? "bg-accent text-accent-foreground"
                 : "text-foreground hover:bg-secondary hover:text-foreground dark:hover:text-white",
             )}
@@ -93,10 +93,10 @@ export function Sidebar() {
           <div className="pl-4">
             {/* Agents (sous Appels entrants) */}
             <Link
-              href="/agents"
+              href="/dashboard/agents"
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-1",
-                pathname === "/agents"
+                pathname === "/dashboard/agents"
                   ? "bg-blue-100 text-accent-foreground"
                   : "text-foreground hover:bg-secondary hover:text-foreground dark:hover:text-white",
               )}
@@ -109,10 +109,10 @@ export function Sidebar() {
 
             {/* Historique (sous Appels entrants) */}
             <Link
-              href="/historique-entrants"
+              href="/dashboard/historique-entrants"
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-3",
-                pathname === "/historique-entrants"
+                pathname === "/dashboard/historique-entrants"
                   ? "bg-accent text-accent-foreground"
                   : "text-foreground hover:bg-secondary hover:text-foreground dark:hover:text-white",
               )}
@@ -126,10 +126,10 @@ export function Sidebar() {
 
           {/* Appels sortants */}
           <Link
-            href="/appels-sortants"
+            href="/dashboard/appels-sortants"
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-1",
-              pathname?.startsWith("/appels-sortants")
+              pathname?.startsWith("/dashboard/appels-sortants")
                 ? "bg-accent text-accent-foreground"
                 : "text-foreground hover:bg-secondary hover:text-foreground dark:hover:text-white",
             )}
@@ -142,10 +142,10 @@ export function Sidebar() {
           <div className="pl-4">
             {/* Agents (sous Appels sortants) */}
             <Link
-              href="/agents-sortants"
+              href="/dashboard/agents-sortants"
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-1",
-                pathname === "/agents-sortants"
+                pathname === "/dashboard/agents-sortants"
                   ? "bg-accent text-accent-foreground"
                   : "text-foreground hover:bg-secondary hover:text-foreground dark:hover:text-white",
               )}
@@ -158,10 +158,10 @@ export function Sidebar() {
 
             {/* Campagnes */}
             <Link
-              href="/campagnes"
+              href="/dashboard/campagnes"
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-1",
-                pathname === "/campagnes"
+                pathname === "/dashboard/campagnes"
                   ? "bg-accent text-accent-foreground"
                   : "text-foreground hover:bg-secondary hover:text-foreground dark:hover:text-white",
               )}
@@ -174,10 +174,10 @@ export function Sidebar() {
 
             {/* Leads */}
             <Link
-              href="/leads"
+              href="/dashboard/leads"
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-1",
-                pathname === "/leads"
+                pathname === "/dashboard/leads"
                   ? "bg-accent text-accent-foreground"
                   : "text-foreground hover:bg-secondary hover:text-foreground dark:hover:text-white",
               )}
@@ -190,10 +190,10 @@ export function Sidebar() {
 
             {/* Historique (sous Appels sortants) */}
             <Link
-              href="/historique-sortants"
+              href="/dashboard/historique-sortants"
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-1",
-                pathname === "/historique-sortants"
+                pathname === "/dashboard/historique-sortants"
                   ? "bg-accent text-accent-foreground"
                   : "text-foreground hover:bg-secondary hover:text-foreground dark:hover:text-white",
               )}

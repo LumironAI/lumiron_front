@@ -28,9 +28,9 @@ export function PlanLimitsDisplay() {
       <h2 className="text-xl font-bold mb-4">Votre abonnement</h2>
 
       <div className="mb-4">
-        <span className="font-medium">Plan:</span> <span className="capitalize">{subscription.plan_name}</span>
+        <span className="font-medium">Plan:</span> <span className="capitalize">{subscription.planName}</span>
         <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-          {subscription.billing_interval === "monthly" ? "Mensuel" : "Annuel"}
+          {subscription.billingInterval === "monthly" ? "Mensuel" : "Annuel"}
         </span>
       </div>
 

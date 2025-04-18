@@ -2,8 +2,8 @@
 
 import { Button } from "@/components/ui/button"
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useRef, useEffect, use } from "react"
+import { useRouter, useParams } from "next/navigation"
 import { Clock, CalendarX, Settings, Info, FileText, Plus } from "lucide-react"
 import { fr } from "date-fns/locale"
 import { Calendar } from "@/components/ui/calendar"
@@ -21,7 +21,10 @@ import { useAgentCreation } from "@/contexts/agent-creation-context"
 import { useToast } from "@/hooks/ui/use-toast"
 import { agentService } from "@/services/agent.service"
 
-export default function AgentInformationsPage({ params }: { params: { id: string } }) {
+export default function AgentInformationsPage({ params }: { params: Promise<{ id: string }> }) {
+  const routeParams = useParams()
+  const unwrappedParams = use(params)
+  const agentId = unwrappedParams.id || (routeParams?.id as string)
   const router = useRouter()
   const { agentData, updateAgentData, setAgentId } = useAgentCreation()
   const { toast } = useToast()
@@ -112,9 +115,9 @@ export default function AgentInformationsPage({ params }: { params: { id: string
   useEffect(() => {
     async function loadAgentData() {
       try {
-        if (params.id) {
+        if (agentId) {
           setIsInitializing(true)
-          const { data, error } = await agentService.getAgentById(params.id)
+          const { data, error } = await agentService.getAgentById(agentId)
 
           if (error) {
             throw error
@@ -133,7 +136,7 @@ export default function AgentInformationsPage({ params }: { params: { id: string
             }
 
             updateAgentData(agentData)
-            setAgentId(params.id)
+            setAgentId(agentId)
           }
         }
       } catch (error) {
@@ -149,7 +152,7 @@ export default function AgentInformationsPage({ params }: { params: { id: string
     }
 
     loadAgentData()
-  }, [params.id, updateAgentData, setAgentId, toast])
+  }, [agentId, updateAgentData, setAgentId, toast])
 
   // Gestionnaires d'événements pour les changements de valeurs
   const handleEstablishmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,7 +225,7 @@ export default function AgentInformationsPage({ params }: { params: { id: string
 
   const handlePrevious = () => {
     saveFormData()
-    router.push(`/agents/${params.id}/create`)
+    router.push(`/dashboard/agents/${agentId}/create`)
   }
 
   const handleSaveAsDraft = async () => {
@@ -234,7 +237,7 @@ export default function AgentInformationsPage({ params }: { params: { id: string
         description: "Votre agent a été sauvegardé comme brouillon",
         variant: "success",
       })
-      router.push("/agents")
+      router.push("/dashboard/agents")
     } catch (error) {
       toast({
         title: "Erreur",
@@ -248,11 +251,6 @@ export default function AgentInformationsPage({ params }: { params: { id: string
 
   const handleContinue = async () => {
     if (!validateForm()) {
-      toast({
-        title: "Formulaire incomplet",
-        description: "Veuillez remplir tous les champs obligatoires",
-        variant: "destructive",
-      })
       return
     }
 
@@ -260,11 +258,11 @@ export default function AgentInformationsPage({ params }: { params: { id: string
       setIsLoading(true)
       await saveFormData()
       toast({
-        title: "Informations enregistrées",
-        description: "Passons à l'étape suivante",
+        title: "Étape terminée",
+        description: "Les informations ont été enregistrées",
         variant: "success",
       })
-      router.push(`/agents/${params.id}/configuration`)
+      router.push(`/dashboard/agents/${agentId}/configuration`)
     } catch (error) {
       toast({
         title: "Erreur",
@@ -276,71 +274,56 @@ export default function AgentInformationsPage({ params }: { params: { id: string
     }
   }
 
-  // Fonction pour sauvegarder toutes les données du formulaire
   const saveFormData = async (asDraft = false) => {
-    // Mise à jour du contexte local
-    const updatedData = {
+    // Save form data
+    const formData = {
       establishment,
       website,
       address,
       city,
+      additionalInfo,
       closureDays: {
         enabled: closureDaysEnabled,
         dates: closureDates,
       },
-      additionalInfo,
     }
 
-    updateAgentData(updatedData)
+    // Update context
+    updateAgentData({
+      ...agentData,
+      ...formData,
+    })
 
-    // Envoi au backend - only update the name and status in the database
-    try {
-      if (asDraft) {
-        await agentService.saveAgentDraft({
-          id: params.id,
-          name: agentData.name,
-          status: "draft",
-        })
-      } else {
-        // Mise à jour d'un agent existant - only basic fields
-        await agentService.updateAgent(params.id, {
-          name: agentData.name,
-          status: "draft",
-        })
-      }
-    } catch (error) {
-      console.error("Erreur lors de la sauvegarde:", error)
-      throw error
+    // Save to API
+    if (agentId) {
+      await agentService.updateAgent(agentId, {
+        name: agentData.name,
+        status: asDraft ? "draft" : agentData.status || "draft",
+      })
     }
   }
 
-  // Gérer les changements d'horaires d'ouverture
   const handleOpeningHoursChange = (day: string, period: "lunch" | "dinner", isOpen: boolean) => {
-    const updatedHours = { ...(agentData.openingHours || defaultOpeningHours) }
-    if (updatedHours && updatedHours[day]) {
-      updatedHours[day][period].open = isOpen
-      updateAgentData({ openingHours: updatedHours })
+    const updatedOpeningHours = { ...agentData.openingHours }
+    if (updatedOpeningHours[day]) {
+      updatedOpeningHours[day][period].open = isOpen
     }
+    updateAgentData({ ...agentData, openingHours: updatedOpeningHours })
   }
 
-  // Gérer les changements d'options
   const handleOptionChange = (option: string, checked: boolean) => {
-    const updatedOptions = { ...(agentData.options || defaultOptions) }
-    if (updatedOptions) {
-      updatedOptions[option] = checked
-      updateAgentData({ options: updatedOptions })
-    }
+    const updatedOptions = { ...agentData.options }
+    updatedOptions[option] = checked
+    updateAgentData({ ...agentData, options: updatedOptions })
   }
 
-  // Gérer les changements d'options alimentaires
   const handleFoodOptionChange = (option: string, checked: boolean) => {
-    const updatedFoodOptions = { ...(agentData.foodOptions || defaultFoodOptions) }
-    if (updatedFoodOptions) {
-      updatedFoodOptions[option] = checked
-      updateAgentData({ foodOptions: updatedFoodOptions })
-    }
+    const updatedFoodOptions = { ...agentData.foodOptions }
+    updatedFoodOptions[option] = checked
+    updateAgentData({ ...agentData, foodOptions: updatedFoodOptions })
   }
 
+  // Afficher un chargement pendant l'initialisation
   if (isInitializing) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -349,172 +332,126 @@ export default function AgentInformationsPage({ params }: { params: { id: string
     )
   }
 
-  // Use openingHours from context or default if not available
-  const openingHours = agentData.openingHours || defaultOpeningHours
-  const options = agentData.options || defaultOptions
-  const foodOptions = agentData.foodOptions || defaultFoodOptions
-
   return (
-    <AgentCreationLayout agentId={params.id} activeTab="informations">
-      <SectionCard>
-        <FormRow>
-          <div ref={establishmentRef}>
-            <label className="block text-sm font-medium mb-1">
-              Nom de l'établissement <span className="text-red-500">*</span>
-            </label>
-            <Input
-              placeholder="Nom de l'établissement"
-              value={establishment}
-              onChange={handleEstablishmentChange}
-              onBlur={() => updateAgentData({ establishment })}
-              className={errors.establishment ? "border-red-500" : ""}
-            />
-            {errors.establishment && <p className="text-red-500 text-xs mt-1">Ce champ est obligatoire</p>}
-          </div>
-          <div ref={websiteRef}>
-            <label className="block text-sm font-medium mb-1">Site internet / Facebook</label>
-            <Input
-              placeholder="https://"
-              value={website}
-              onChange={handleWebsiteChange}
-              onBlur={() => updateAgentData({ website })}
-              className={errors.website ? "border-red-500" : ""}
-            />
-            {errors.website && <p className="text-red-500 text-xs mt-1">Ce champ est obligatoire</p>}
-          </div>
-        </FormRow>
-
-        <FormRow>
-          <div ref={addressRef}>
-            <label className="block text-sm font-medium mb-1">Adresse</label>
-            <Input
-              placeholder="Adresse"
-              value={address}
-              onChange={handleAddressChange}
-              onBlur={() => updateAgentData({ address })}
-              className={errors.address ? "border-red-500" : ""}
-            />
-            {errors.address && <p className="text-red-500 text-xs mt-1">Ce champ est obligatoire</p>}
-          </div>
-          <div ref={cityRef}>
-            <label className="block text-sm font-medium mb-1">
-              Ville <span className="text-red-500">*</span>
-            </label>
-            <Input
-              placeholder="Ville"
-              value={city}
-              onChange={handleCityChange}
-              onBlur={() => updateAgentData({ city })}
-              className={errors.city ? "border-red-500" : ""}
-            />
-            {errors.city && <p className="text-red-500 text-xs mt-1">Ce champ est obligatoire</p>}
-          </div>
-        </FormRow>
+    <AgentCreationLayout agentId={agentId} activeTab="informations">
+      <SectionCard title="Informations principales">
+        <div ref={establishmentRef}>
+          <FormRow
+            label="Nom de l'établissement"
+            required
+            error={isSubmitted && errors.establishment ? "Champ requis" : undefined}
+          >
+            <Input value={establishment} onChange={handleEstablishmentChange} />
+          </FormRow>
+        </div>
+        <div ref={websiteRef}>
+          <FormRow label="Site web">
+            <Input value={website} onChange={handleWebsiteChange} type="url" placeholder="https://..." />
+          </FormRow>
+        </div>
+        <div ref={addressRef}>
+          <FormRow label="Adresse">
+            <Input value={address} onChange={handleAddressChange} />
+          </FormRow>
+        </div>
+        <div ref={cityRef}>
+          <FormRow
+            label="Ville"
+            required
+            error={isSubmitted && errors.city ? "Champ requis" : undefined}
+          >
+            <Input value={city} onChange={handleCityChange} />
+          </FormRow>
+        </div>
       </SectionCard>
 
       <SectionCard icon={<Clock className="h-5 w-5" />} title="Horaires d'ouverture" iconColor="bg-icon-clock">
-        <div className="mb-4 grid grid-cols-7 text-center">
-          <div></div>
-          <div className="col-span-3 font-medium">Midi</div>
-          <div className="col-span-3 font-medium">Soir</div>
-        </div>
-
-        {Object.entries(openingHours).map(([day, periods]) => (
-          <OpeningHoursRow
-            key={day}
-            day={day}
-            initialLunch={periods.lunch.open}
-            initialDinner={periods.dinner.open}
-            onLunchChange={(isOpen) => handleOpeningHoursChange(day, "lunch", isOpen)}
-            onDinnerChange={(isOpen) => handleOpeningHoursChange(day, "dinner", isOpen)}
-          />
-        ))}
-      </SectionCard>
-
-      <SectionCard icon={<CalendarX className="h-5 w-5" />} title="Jours de fermeture" iconColor="bg-icon-calendar">
-        <div className="flex justify-end mb-4">
-          <Switch
-            checked={closureDaysEnabled}
-            onCheckedChange={(checked) => {
-              handleClosureDaysEnabledChange(checked)
-              updateAgentData({
-                closureDays: {
-                  enabled: checked,
-                  dates: closureDates,
-                },
-              })
-            }}
-          />
-        </div>
-
-        {closureDaysEnabled && (
-          <>
-            <div className="mb-4">
-              <div className="text-sm font-medium mb-2">Récapitulatif :</div>
-              <div className="text-sm text-muted-foreground">Du 05/04/2025 au 10/04/2025</div>
-            </div>
-
-            <div className="flex justify-center">
-              <Calendar
-                mode="multiple"
-                selected={closureDates}
-                onSelect={(selectedDates) => {
-                  const dates = selectedDates || []
-                  handleClosureDatesChange(dates)
-                  updateAgentData({
-                    closureDays: {
-                      enabled: closureDaysEnabled,
-                      dates,
-                    },
-                  })
-                }}
-                className="rounded-md border"
-                locale={fr}
-                month={new Date(2025, 3)} // Avril 2025
-                fixedWeeks
+        <FormRow>
+          <div className="space-y-6">
+            {Object.entries(agentData.openingHours || defaultOpeningHours).map(([day, periods]) => (
+              <OpeningHoursRow
+                key={day}
+                day={day}
+                lunchHours={periods.lunch}
+                dinnerHours={periods.dinner}
+                onToggle={handleOpeningHoursChange}
               />
+            ))}
+          </div>
+        </FormRow>
+      </SectionCard>
+
+      <SectionCard icon={<CalendarX className="h-5 w-5" />} title="Jours de fermeture" iconColor="bg-icon-closure">
+        <FormRow>
+          <div className="w-full space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Périodes de fermeture</span>
+              <Switch checked={closureDaysEnabled} onCheckedChange={handleClosureDaysEnabledChange} />
             </div>
-          </>
-        )}
+            {closureDaysEnabled && (
+              <div className="border rounded-lg p-3 mt-3">
+                <Calendar
+                  mode="multiple"
+                  selected={closureDates}
+                  onSelect={handleClosureDatesChange}
+                  className="mx-auto"
+                  locale={fr}
+                />
+              </div>
+            )}
+          </div>
+        </FormRow>
       </SectionCard>
 
-      <SectionCard icon={<Settings className="h-5 w-5" />} title="Options & Services" iconColor="bg-icon-settings">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2">
-          {Object.entries(options).map(([option, isEnabled]) => (
-            <OptionToggle
-              key={option}
-              label={option}
-              initialValue={isEnabled}
-              onChange={(checked) => handleOptionChange(option, checked)}
-            />
-          ))}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SectionCard icon={<Settings className="h-5 w-5" />} title="Options disponibles" iconColor="bg-icon-settings">
+          <FormRow>
+            <div className="w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {Object.entries(agentData.options || defaultOptions).map(([option, isChecked]) => (
+                  <OptionToggle
+                    key={option}
+                    label={option}
+                    checked={isChecked}
+                    onCheckedChange={(checked) => handleOptionChange(option, checked)}
+                  />
+                ))}
+              </div>
+            </div>
+          </FormRow>
+          <FormRow>
+            <div className="flex justify-end">
+              <Button variant="ghost" className="text-primary flex items-center">
+                <Plus className="h-4 w-4 mr-1" /> Ajouter une option
+              </Button>
+            </div>
+          </FormRow>
+        </SectionCard>
 
-        <div className="mt-4 flex justify-end">
-          <Button variant="ghost" className="text-primary flex items-center">
-            <Plus className="h-4 w-4 mr-1" /> <span className="text-primary">Ajouter une option</span>
-          </Button>
-        </div>
-      </SectionCard>
-
-      <SectionCard icon={<Settings className="h-5 w-5" />} title="Options alimentaires" iconColor="bg-icon-settings">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2">
-          {Object.entries(foodOptions).map(([option, isEnabled]) => (
-            <OptionToggle
-              key={option}
-              label={option}
-              initialValue={isEnabled}
-              onChange={(checked) => handleFoodOptionChange(option, checked)}
-            />
-          ))}
-        </div>
-
-        <div className="mt-4 flex justify-end">
-          <Button variant="ghost" className="text-primary flex items-center">
-            <Plus className="h-4 w-4 mr-1" /> <span className="text-primary">Ajouter une option</span>
-          </Button>
-        </div>
-      </SectionCard>
+        <SectionCard icon={<Settings className="h-5 w-5" />} title="Options alimentaires" iconColor="bg-icon-settings">
+          <FormRow>
+            <div className="w-full">
+              <div className="grid grid-cols-1 gap-3">
+                {Object.entries(agentData.foodOptions || defaultFoodOptions).map(([option, isChecked]) => (
+                  <OptionToggle
+                    key={option}
+                    label={option}
+                    checked={isChecked}
+                    onCheckedChange={(checked) => handleFoodOptionChange(option, checked)}
+                  />
+                ))}
+              </div>
+            </div>
+          </FormRow>
+          <FormRow>
+            <div className="flex justify-end">
+              <Button variant="ghost" className="text-primary flex items-center">
+                <Plus className="h-4 w-4 mr-1" /> Ajouter une option
+              </Button>
+            </div>
+          </FormRow>
+        </SectionCard>
+      </div>
 
       <SectionCard icon={<FileText className="h-5 w-5" />} title="Documents" iconColor="bg-icon-document">
         <FileUpload label="Importer documents" acceptedFormats="Format accepté: PDF (max10MB)" />

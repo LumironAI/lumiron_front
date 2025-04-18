@@ -1,106 +1,108 @@
 "use client"
 
 import type React from "react"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/agent-creation/common/section-card"
 import { FormRow } from "@/components/agent-creation/common/form-row"
 import { ActionButtons } from "@/components/agent-creation/common/action-buttons"
 import { AgentCreationLayout } from "@/components/agent-creation/layout/agent-creation-layout"
-import { SectorGrid } from "@/components/agent-creation/step1-create/sector-grid"
 import { useAgentCreation } from "@/contexts/agent-creation-context"
 import { useToast } from "@/hooks/ui/use-toast"
 import { agentService } from "@/services/agent.service"
+import { SectorGrid } from "@/components/agent-creation/step1-create/sector-grid"
 
-export default function AgentCreatePage({ params }: { params: { id: string } }) {
+export default function AgentCreatePage() {
   const router = useRouter()
-  const { agentData, updateAgentData, setAgentId } = useAgentCreation()
+  const params = useParams()
+  const agentId = params?.id as string
   const { toast } = useToast()
-
-  const [name, setName] = useState(agentData.name || "")
-  const [sector, setSector] = useState(agentData.sector || "restaurant")
   const [isLoading, setIsLoading] = useState(false)
-  const [isInitializing, setIsInitializing] = useState(true)
+  const { agentData, updateAgentData, setAgentId } = useAgentCreation()
+  const [agentName, setAgentName] = useState(agentData.name || "")
+  const [agentSector, setAgentSector] = useState(agentData.sector || "restaurant")
 
-  // Load agent data if we have an ID
   useEffect(() => {
-    async function loadAgentData() {
-      try {
-        if (params.id) {
-          setIsInitializing(true)
-          const { data, error } = await agentService.getAgentById(params.id)
-
+    async function loadAgent() {
+      // Si on a un ID, on charge l'agent
+      if (agentId) {
+        try {
+          const { data, error } = await agentService.getAgentById(agentId)
           if (error) {
-            throw error
+            toast({
+              title: "Erreur",
+              description: "Impossible de charger l'agent",
+              variant: "destructive",
+            })
+            return
           }
 
           if (data) {
-            // Update context with loaded data
-            const agentData = {
-              id: data.id.toString(),
-              name: data.name,
-              status: data.status,
-              sector: "restaurant", // Default sector since we don't store it in the database
-            }
-
-            updateAgentData(agentData)
-            setAgentId(params.id)
-
-            // Update local state
-            setName(data.name || "")
+            // Si on a des données, on les charge
+            setAgentName(data.name || "")
+            setAgentSector(data.sector || "restaurant")
+            // On met à jour le contexte
+            updateAgentData({
+              ...agentData,
+              name: data.name || "",
+              sector: data.sector || "restaurant",
+            })
+            setAgentId(agentId)
           }
+        } catch (error) {
+          console.error("Erreur lors du chargement de l'agent:", error)
+          toast({
+            title: "Erreur",
+            description: "Impossible de charger l'agent",
+            variant: "destructive",
+          })
         }
-      } catch (error) {
-        console.error("Error loading agent data:", error)
-        toast({
-          title: "Erreur",
-          description: "Impossible de charger les données de l'agent",
-          variant: "destructive",
-        })
-      } finally {
-        setIsInitializing(false)
       }
     }
 
-    loadAgentData()
-  }, [params.id, updateAgentData, setAgentId, toast])
+    loadAgent()
+  }, [agentId, agentData, updateAgentData, setAgentId, toast])
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value
-    setName(newName)
+    setAgentName(e.target.value)
   }
 
-  const handleSectorChange = (newSector: string) => {
-    setSector(newSector)
+  const handleSectorChange = (sectorId: string) => {
+    setAgentSector(sectorId)
   }
 
   const handleSaveAsDraft = async () => {
     try {
       setIsLoading(true)
-
-      // Update context data
-      updateAgentData({ name, sector })
-
-      // Save to database
-      await agentService.updateAgent(params.id, {
-        name,
-        status: "draft",
-      })
-
+      const updatedAgentData = {
+        ...agentData,
+        name: agentName,
+        sector: agentSector,
+      }
+      
+      updateAgentData(updatedAgentData)
+      
+      if (agentId) {
+        await agentService.updateAgent(agentId, {
+          name: agentName,
+          sector: agentSector,
+          status: "draft",
+        })
+      }
+      
       toast({
         title: "Brouillon enregistré",
         description: "Votre agent a été sauvegardé comme brouillon",
         variant: "success",
       })
-
-      router.push("/agents")
+      
+      router.push("/dashboard/agents")
     } catch (error) {
-      console.error("Error saving draft:", error)
+      console.error("Erreur lors de la sauvegarde:", error)
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue lors de la sauvegarde",
+        description: "Impossible de sauvegarder les informations",
         variant: "destructive",
       })
     } finally {
@@ -109,35 +111,47 @@ export default function AgentCreatePage({ params }: { params: { id: string } }) 
   }
 
   const handleContinue = async () => {
-    try {
-      setIsLoading(true)
-
-      // Validate required fields
-      if (!name.trim()) {
-        toast({
-          title: "Champ requis",
-          description: "Veuillez saisir un nom pour votre agent",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Update context data
-      updateAgentData({ name, sector })
-
-      // Save to database
-      await agentService.updateAgent(params.id, {
-        name,
-        status: "draft",
-      })
-
-      // Navigate to next step
-      router.push(`/agents/${params.id}/informations`)
-    } catch (error) {
-      console.error("Error saving agent:", error)
+    if (!agentName.trim()) {
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue lors de la sauvegarde",
+        description: "Veuillez saisir un nom pour l'agent",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    
+    try {
+      const updatedAgentData = {
+        ...agentData,
+        name: agentName,
+        sector: agentSector,
+      }
+      
+      updateAgentData(updatedAgentData)
+      
+      // Si on a un ID, on met à jour l'agent
+      if (agentId) {
+        await agentService.updateAgent(agentId, {
+          name: agentName,
+          sector: agentSector,
+          status: "draft",
+        })
+      }
+      
+      toast({
+        title: "Succès",
+        description: "Les informations ont été enregistrées",
+        variant: "success",
+      })
+      
+      router.push(`/dashboard/agents/${agentId}/informations`)
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder les informations",
         variant: "destructive",
       })
     } finally {
@@ -145,29 +159,28 @@ export default function AgentCreatePage({ params }: { params: { id: string } }) 
     }
   }
 
-  if (isInitializing) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
   return (
-    <AgentCreationLayout agentId={params.id} activeTab="create">
-      <SectionCard>
+    <AgentCreationLayout agentId={agentId} activeTab="create">
+      <SectionCard title="Informations de base">
         <FormRow>
           <div>
             <label className="block text-sm font-medium mb-1">
               Nom de l'agent <span className="text-red-500">*</span>
             </label>
-            <Input placeholder="Nom de l'agent" value={name} onChange={handleNameChange} className="w-full" />
+            <Input
+              placeholder="Nom de l'agent"
+              value={agentName}
+              onChange={handleNameChange}
+            />
           </div>
         </FormRow>
       </SectionCard>
-
+      
       <SectionCard title="Secteur d'activité">
-        <SectorGrid selectedSector={sector} onSectorChange={handleSectorChange} />
+        <SectorGrid 
+          selectedSector={agentSector} 
+          onSectorChange={handleSectorChange} 
+        />
       </SectionCard>
 
       <ActionButtons

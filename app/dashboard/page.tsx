@@ -6,15 +6,20 @@ import { useAgents } from "@/hooks/use-agents"
 import { useCallLogs } from "@/hooks/use-call-logs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Phone, PhoneOff } from "lucide-react"
+import { PlusCircle, Phone, PhoneOff, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { fr } from "date-fns/locale"
+import { useState } from "react"
+import { agentService } from "@/services"
+import { useToast } from "@/hooks/ui/use-toast"
 
 export default function DashboardPage() {
   const router = useRouter()
   const { agents, isLoading: agentsLoading } = useAgents()
   const { callLogs, isLoading: callsLoading } = useCallLogs()
+  const [isCreating, setIsCreating] = useState(false)
+  const { toast } = useToast()
 
   const activeAgents = agents?.filter((agent) => agent.status === "active") || []
   const draftAgents = agents?.filter((agent) => agent.status === "draft") || []
@@ -23,6 +28,37 @@ export default function DashboardPage() {
   const missedCalls = callLogs?.filter((call) => call.status === "missed") || []
 
   const isLoading = agentsLoading || callsLoading
+
+  const handleCreateAgent = async () => {
+    try {
+      setIsCreating(true)
+
+      // Create a temporary agent in the database first
+      const initialData = {
+        name: "Nouvel agent",
+        status: "draft" as "active" | "inactive" | "draft",
+      }
+
+      // Create a temporary agent and get its ID
+      const agent = await agentService.createAgent(initialData)
+      
+      if (agent) {
+        // Navigate to the first step of agent creation with the real ID
+        router.push(`/dashboard/agents/${agent.id}/create`)
+      } else {
+        throw new Error("Failed to create agent")
+      }
+    } catch (error) {
+      console.error("Error creating agent:", error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer un nouvel agent",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreating(false)
+    }
+  }
 
   return (
     <div className="p-6">
@@ -39,12 +75,23 @@ export default function DashboardPage() {
         <div className="grid gap-6">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold">Vue d'ensemble</h2>
-            <Link href="/agents/create">
-              <Button className="bg-[#2c90f6] hover:bg-[#2c90f6]/90 text-white">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Créer un agent
-              </Button>
-            </Link>
+            <Button 
+              onClick={handleCreateAgent}
+              disabled={isCreating}
+              className="bg-[#2c90f6] hover:bg-[#2c90f6]/90 text-white"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Création...
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Créer un agent
+                </>
+              )}
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

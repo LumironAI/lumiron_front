@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { PageHeader } from "@/components/header/page-header"
 import { UserNav } from "@/components/header/user-nav"
@@ -16,8 +16,9 @@ import { useAgents } from "@/hooks/use-agents"
 import { useToast } from "@/hooks/ui/use-toast"
 import { agentService } from "@/services/agent.service"
 
-export default function AgentDetailPage() {
-  const params = useParams()
+export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const routeParams = useParams()
+  const unwrappedParams = use(params)
   const router = useRouter()
   const { agents, updateAgent, createAgent, isLoading: agentsLoading } = useAgents()
   const { toast } = useToast()
@@ -30,7 +31,7 @@ export default function AgentDetailPage() {
 
   // Determine if we're in create mode or edit mode
   useEffect(() => {
-    if (params.id === "create") {
+    if (unwrappedParams.id === "create") {
       setIsCreateMode(true)
       setIsLoading(false)
       return
@@ -42,7 +43,7 @@ export default function AgentDetailPage() {
         setIsLoading(true)
 
         // Handle the case where id might be "create" or a number
-        const agentId = params.id as string
+        const agentId = unwrappedParams.id as string
 
         const { data, error } = await agentService.getAgentById(agentId)
 
@@ -72,10 +73,10 @@ export default function AgentDetailPage() {
       }
     }
 
-    if (params.id && params.id !== "create") {
+    if (unwrappedParams.id && unwrappedParams.id !== "create") {
       fetchAgent()
     }
-  }, [params.id, router, toast])
+  }, [unwrappedParams.id, router, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,13 +100,13 @@ export default function AgentDetailPage() {
 
         // Navigate to the first step of agent creation with the new ID
         if (agent && agent.id) {
-          router.push(`/agents/${agent.id}/create`)
+          router.push(`/dashboard/agents/${agent.id}/create`)
         } else {
           throw new Error("Failed to create agent")
         }
       } else {
         // Update an existing agent
-        const agentId = params.id as string
+        const agentId = unwrappedParams.id as string
         await updateAgent(agentId, { name, status })
         toast({
           title: "Agent mis à jour",

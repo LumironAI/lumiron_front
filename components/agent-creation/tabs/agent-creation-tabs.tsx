@@ -11,22 +11,22 @@ export function AgentCreationTabs({ agentId, activeTab }: AgentCreationTabsProps
     {
       id: "create",
       label: "Création",
-      href: `/agents/${agentId}/create`,
+      href: `/dashboard/agents/${agentId}/create`,
     },
     {
       id: "informations",
       label: "Informations",
-      href: `/agents/${agentId}/informations`,
+      href: `/dashboard/agents/${agentId}/informations`,
     },
     {
       id: "configuration",
       label: "Configuration",
-      href: `/agents/${agentId}/configuration`,
+      href: `/dashboard/agents/${agentId}/configuration`,
     },
     {
       id: "recapitulatif",
       label: "Récapitulatif",
-      href: `/agents/${agentId}/recapitulatif`,
+      href: `/dashboard/agents/${agentId}/recapitulatif`,
     },
   ]
 

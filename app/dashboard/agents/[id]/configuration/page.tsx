@@ -1,19 +1,25 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
-import { Phone, Volume2, UserPlus, Settings, Database } from "lucide-react"
+import { useState, useEffect, use } from "react"
+import { useRouter, useParams } from "next/navigation" 
+import { Phone, Volume2, UserPlus, Settings, Database, VolumeX, VolumeUp, VolumeUp2, ArrowUp, ArrowDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AgentCreationLayout } from "@/components/agent-creation/layout/agent-creation-layout"
 import { useAgentCreation } from "@/contexts/agent-creation-context"
 import { useToast } from "@/hooks/ui/use-toast"
 import { agentService } from "@/services/agent.service"
 import { ActionButtons } from "@/components/agent-creation/common/action-buttons"
+import { SectionCard } from "@/components/agent-creation/common/section-card"
+import { FormRow } from "@/components/agent-creation/common/form-row"
 
-export default function AgentConfigurationPage({ params }: { params: { id: string } }) {
+export default function AgentConfigurationPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
+  const routeParams = useParams() 
+  const unwrappedParams = use(params)
+  const agentId = unwrappedParams.id || (routeParams?.id as string)
   const { agentData, updateAgentData, setAgentId } = useAgentCreation()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
@@ -29,13 +35,7 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
     (agentData.voiceType as "enthousiaste" | "professionnelle") || "enthousiaste",
   )
   const [transferPhone, setTransferPhone] = useState(agentData.transferPhone || "")
-  const [examples, setExamples] = useState([
-    { id: "1", enabled: false, label: "Exemple 1" },
-    { id: "2", enabled: false, label: "Exemple 2" },
-    { id: "3", enabled: false, label: "Exemple 3" },
-    { id: "4", enabled: false, label: "Exemple 4" },
-    { id: "5", enabled: false, label: "Exemple 5" },
-  ])
+  const [voiceExamples, setVoiceExamples] = useState<string[]>(agentData.voiceExamples || [])
   const [options, setOptions] = useState<{ id: string; label: string; description?: string; enabled: boolean }[]>([
     { id: "sms", label: "SMS", description: "Activer l'envoi de SMS (0.15 centimes / SMS)", enabled: false },
     { id: "autres", label: "Autres", enabled: false },
@@ -75,17 +75,30 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
   useEffect(() => {
     async function loadAgentData() {
       try {
-        if (params.id) {
+        if (agentId) {
           setIsInitializing(true)
-          const { data, error } = await agentService.getAgentById(params.id)
+          const { data, error } = await agentService.getAgentById(agentId)
+
+          if (error) {
+            throw error
+          }
+
           if (data) {
             // Update context with loaded data
-            updateAgentData({
-              id: params.id,
+            const agentData = {
+              id: data.id.toString(),
               name: data.name,
               status: data.status,
-            })
-            setAgentId(params.id)
+              voiceGender: data.voiceGender || "homme",
+              voiceType: data.voiceType || "professionnelle",
+            }
+
+            updateAgentData(agentData)
+            setAgentId(agentId)
+
+            // Update local state
+            setGender(data.voiceGender || "homme")
+            setVoiceType(data.voiceType || "professionnelle")
           }
         }
       } catch (error) {
@@ -101,14 +114,14 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
     }
 
     loadAgentData()
-  }, [params.id, updateAgentData, setAgentId, toast])
+  }, [agentId, updateAgentData, setAgentId, toast])
 
   // Gestionnaires d'événements
   const handlePrevious = async () => {
     try {
       setIsLoading(true)
       await saveData()
-      router.push(`/agents/${params.id}/informations`)
+      router.push(`/agents/${agentId}/informations`)
     } catch (error) {
       toast({
         title: "Erreur",
@@ -150,7 +163,7 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
         description: "Passons à l'étape suivante",
         variant: "success",
       })
-      router.push(`/agents/${params.id}/recapitulatif`)
+      router.push(`/agents/${agentId}/recapitulatif`)
     } catch (error) {
       toast({
         title: "Erreur",
@@ -167,11 +180,11 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
     const updatedData = {
       phoneNumber,
       deviceType,
-      voiceGender: gender,
+      voiceGender,
       voiceType,
       transferPhone,
       configOptions: options,
-      integrations,
+      integrations: integrations.filter((i) => i.enabled),
     }
 
     updateAgentData(updatedData)
@@ -180,13 +193,13 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
     try {
       if (asDraft) {
         await agentService.saveAgentDraft({
-          id: params.id,
+          id: agentId,
           name: agentData.name,
           status: "draft",
         })
       } else {
         // Mise à jour d'un agent existant - only basic fields
-        await agentService.updateAgent(params.id, {
+        await agentService.updateAgent(agentId, {
           name: agentData.name,
           status: "draft",
         })
@@ -219,9 +232,10 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
   }
 
   const toggleExample = (id: string) => {
-    setExamples((prev) =>
-      prev.map((example) => (example.id === id ? { ...example, enabled: !example.enabled } : example)),
-    )
+    const updatedExamples = voiceExamples.includes(id)
+      ? voiceExamples.filter((exId) => exId !== id)
+      : [...voiceExamples, id]
+    setVoiceExamples(updatedExamples)
   }
 
   if (isInitializing) {
@@ -233,7 +247,7 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
   }
 
   return (
-    <AgentCreationLayout agentId={params.id} activeTab="configuration">
+    <AgentCreationLayout agentId={agentId} activeTab="configuration">
       {/* Section Numéro de téléphone */}
       <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
@@ -290,71 +304,56 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
       </div>
 
       {/* Section Voix de l'agent */}
-      <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-full bg-purple-100">
-            <Volume2 className="h-5 w-5 text-foreground" />
-          </div>
-          <h3 className="font-medium text-lg">Voix de l'agent</h3>
-        </div>
+      <SectionCard
+        icon={<VolumeUp className="h-5 w-5" />}
+        title="Voix de l'agent"
+        iconColor="bg-icon-voice"
+      >
+        <FormRow label="Genre">
+          <Select value={gender} onValueChange={(value: "homme" | "femme") => setGender(value)}>
+            <SelectTrigger className="w-full max-w-xs">
+              <SelectValue placeholder="Sélectionnez un genre" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="homme">Homme</SelectItem>
+              <SelectItem value="femme">Femme</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormRow>
 
-        <div className="flex items-center justify-between">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h4 className="font-medium mb-4">Genre</h4>
-              <div className="flex gap-8">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={gender === "homme"}
-                    onChange={() => setGender("homme")}
-                    className="form-radio h-4 w-4 text-primary"
-                  />
-                  <span>Homme</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={gender === "femme"}
-                    onChange={() => setGender("femme")}
-                    className="form-radio h-4 w-4 text-primary"
-                  />
-                  <span>Femme</span>
-                </label>
+        <FormRow label="Type de voix">
+          <Select
+            value={voiceType}
+            onValueChange={(value: "enthousiaste" | "professionnelle") => setVoiceType(value)}
+          >
+            <SelectTrigger className="w-full max-w-xs">
+              <SelectValue placeholder="Sélectionnez un type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="professionnelle">Professionnelle</SelectItem>
+              <SelectItem value="enthousiaste">Enthousiaste</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormRow>
+
+        <FormRow label="Exemples de voix">
+          <div className="space-y-2 w-full">
+            {voiceExamples.map((example) => (
+              <div
+                key={example}
+                className="flex items-center justify-between p-3 border rounded-md hover:bg-accent cursor-pointer"
+                onClick={() => toggleExample(example)}
+              >
+                <div className="flex items-center space-x-3">
+                  <VolumeUp2 className="h-5 w-5 text-primary" />
+                  <span>{example}</span>
+                </div>
+                <Switch checked={voiceExamples.includes(example)} />
               </div>
-            </div>
-
-            <div>
-              <h4 className="font-medium mb-4">Sélection de voix</h4>
-              <div className="flex gap-8">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={voiceType === "enthousiaste"}
-                    onChange={() => setVoiceType("enthousiaste")}
-                    className="form-radio h-4 w-4 text-primary"
-                  />
-                  <span>Enthousiaste</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={voiceType === "professionnelle"}
-                    onChange={() => setVoiceType("professionnelle")}
-                    className="form-radio h-4 w-4 text-primary"
-                  />
-                  <span>Professionnelle</span>
-                </label>
-              </div>
-            </div>
+            ))}
           </div>
-
-          <Button variant="outline" className="flex items-center gap-2">
-            <Volume2 className="h-4 w-4" />
-            Écouter
-          </Button>
-        </div>
-      </div>
+        </FormRow>
+      </SectionCard>
 
       {/* Section Transfert d'appel */}
       <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
@@ -395,32 +394,14 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
             />
           </div>
         </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {examples.map((example) => (
-            <div key={example.id} className="flex items-center gap-2">
-              <Switch checked={example.enabled} onCheckedChange={() => toggleExample(example.id)} />
-              <span className="text-sm">{example.label}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex justify-end mt-4">
-          <Button variant="ghost" className="text-primary flex items-center">
-            <span className="mr-1">+</span> Ajouter une option
-          </Button>
-        </div>
       </div>
 
       {/* Section Options */}
-      <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-full bg-gray-100">
-            <Settings className="h-5 w-5 text-foreground" />
-          </div>
-          <h3 className="font-medium text-lg">Options</h3>
-        </div>
-
+      <SectionCard
+        icon={<Settings className="h-5 w-5" />}
+        title="Options"
+        iconColor="bg-icon-settings"
+      >
         <div className="space-y-4">
           {options.map((option) => (
             <div key={option.id} className="flex items-center justify-between">
@@ -437,17 +418,14 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
       {/* Section Intégrations */}
-      <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-full bg-yellow-100">
-            <Database className="h-5 w-5 text-foreground" />
-          </div>
-          <h3 className="font-medium text-lg">Intégrations</h3>
-        </div>
-
+      <SectionCard
+        icon={<Database className="h-5 w-5" />}
+        title="Intégrations"
+        iconColor="bg-icon-database"
+      >
         <div className="space-y-6">
           {integrations.map((integration) => (
             <div key={integration.id} className="border-b pb-4 last:border-0 last:pb-0">
@@ -485,7 +463,7 @@ export default function AgentConfigurationPage({ params }: { params: { id: strin
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
       {/* Boutons d'action */}
       <ActionButtons

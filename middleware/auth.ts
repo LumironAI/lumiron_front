@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 // Define protected routes that require authentication
-const protectedRoutes = ["/agents", "/dashboard", "/appels-entrants", "/appels-sortants"]
+const protectedRoutes = ["/dashboard/agents", "/dashboard", "/dashboard/appels-entrants", "/dashboard/appels-sortants", "/dashboard/historique-entrants", "/dashboard/historique-sortants", "/dashboard/agents-sortants", "/dashboard/campagnes", "/dashboard/leads"]
 
 // Define public routes that don't require authentication
 const publicRoutes = ["/login", "/register", "/forgot-password", "/reset-password"]
@@ -24,9 +24,9 @@ export function authMiddleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // If the user is authenticated and trying to access a public route, redirect to dashboard
+  // If the user is authenticated and trying to access a public route, redirect to dashboard/agents
   if (isAuthenticated && isPublicRoute) {
-    return NextResponse.redirect(new URL("/agents", request.url))
+    return NextResponse.redirect(new URL("/dashboard/agents", request.url))
   }
 
   // If the user is not authenticated and accessing the root, redirect to login

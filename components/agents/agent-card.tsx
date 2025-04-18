@@ -31,10 +31,10 @@ export function AgentCard({ agent }: AgentCardProps) {
   const getEditLink = () => {
     if (agent.status === "draft") {
       // For draft agents, go to the first step
-      return `/agents/${agent.id}/create`
+      return `/dashboard/agents/${agent.id}/create`
     }
     // For active agents, go to the information step
-    return `/agents/${agent.id}/informations`
+    return `/dashboard/agents/${agent.id}/informations`
   }
 
   return (

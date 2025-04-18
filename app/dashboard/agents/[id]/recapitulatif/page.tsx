@@ -1,7 +1,7 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
+import { useState, useEffect, use } from "react"
 import { AgentCreationLayout } from "@/components/agent-creation/layout/agent-creation-layout"
 import { ActionButtons } from "@/components/agent-creation/common/action-buttons"
 import { InfoSummarySection } from "@/components/agent-creation/step4-recap/info-summary-section"
@@ -15,8 +15,11 @@ import { useAgentCreation } from "@/contexts/agent-creation-context"
 import { useToast } from "@/hooks/ui/use-toast"
 import { agentService } from "@/services/agent.service"
 
-export default function AgentRecapPage({ params }: { params: { id: string } }) {
+export default function AgentRecapPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
+  const routeParams = useParams()
+  const unwrappedParams = use(params)
+  const agentId = unwrappedParams.id || (routeParams?.id as string)
   const { agentData, updateAgentData, resetAgentData, setAgentId } = useAgentCreation()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
@@ -26,17 +29,17 @@ export default function AgentRecapPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     async function loadAgentData() {
       try {
-        if (params.id) {
+        if (agentId) {
           setIsInitializing(true)
-          const { data, error } = await agentService.getAgentById(params.id)
+          const { data, error } = await agentService.getAgentById(agentId)
           if (data) {
             // Update context with loaded data
             updateAgentData({
-              id: params.id,
+              id: agentId,
               name: data.name,
               status: data.status,
             })
-            setAgentId(params.id)
+            setAgentId(agentId)
           }
         }
       } catch (error) {
@@ -52,17 +55,16 @@ export default function AgentRecapPage({ params }: { params: { id: string } }) {
     }
 
     loadAgentData()
-  }, [params.id, updateAgentData, setAgentId, toast])
+  }, [agentId, updateAgentData, setAgentId, toast])
 
   const handlePrevious = () => {
-    router.push(`/agents/${params.id}/configuration`)
+    router.push(`/dashboard/agents/${agentId}/configuration`)
   }
 
   const handleSaveAsDraft = async () => {
     try {
       setIsLoading(true)
-      await agentService.saveAgentDraft({
-        id: params.id,
+      await agentService.updateAgent(agentId, {
         name: agentData.name,
         status: "draft",
       })
@@ -72,7 +74,7 @@ export default function AgentRecapPage({ params }: { params: { id: string } }) {
         variant: "success",
       })
       resetAgentData()
-      router.push("/agents")
+      router.push("/dashboard/agents")
     } catch (error) {
       toast({
         title: "Erreur",
@@ -87,7 +89,7 @@ export default function AgentRecapPage({ params }: { params: { id: string } }) {
   const handleCreateAgent = async () => {
     try {
       setIsLoading(true)
-      await agentService.updateAgent(params.id, {
+      await agentService.updateAgent(agentId, {
         name: agentData.name,
         status: "active",
       })
@@ -98,7 +100,7 @@ export default function AgentRecapPage({ params }: { params: { id: string } }) {
         variant: "success",
       })
       resetAgentData()
-      router.push("/agents")
+      router.push("/dashboard/agents")
     } catch (error) {
       toast({
         title: "Erreur",
@@ -141,7 +143,7 @@ export default function AgentRecapPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <AgentCreationLayout agentId={params.id} activeTab="recapitulatif">
+    <AgentCreationLayout agentId={agentId} activeTab="recapitulatif">
       <InfoSummarySection
         agentName={agentData.name}
         sector={agentData.sector}
@@ -161,8 +163,8 @@ export default function AgentRecapPage({ params }: { params: { id: string } }) {
       <OptionsSummarySection options={agentData.options} foodOptions={agentData.foodOptions} />
 
       <VoiceSummarySection
-        gender={agentData.voiceGender as "homme" | "femme"}
-        voiceType={agentData.voiceType as "enthousiaste" | "professionnelle"}
+        gender={agentData.voiceGender ? (agentData.voiceGender as "homme" | "femme") : "homme"}
+        voiceType={agentData.voiceType ? (agentData.voiceType as "enthousiaste" | "professionnelle") : "professionnelle"}
       />
 
       <IntegrationsSummarySection integrations={enabledIntegrations} />

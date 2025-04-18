@@ -19,14 +19,18 @@ export function EmptyState() {
       // Create a temporary agent
       const initialData = {
         name: "Nouvel agent",
-        status: "draft",
+        status: "draft" as "active" | "inactive" | "draft",
       }
 
       // Create a temporary agent and get its ID
-      const agentId = await agentService.createTemporaryAgent(initialData)
-
-      // Navigate to the first step of agent creation with the real ID
-      router.push(`/agents/${agentId}/create`)
+      const agent = await agentService.createAgent(initialData)
+      
+      if (agent) {
+        // Navigate to the first step of agent creation with the real ID
+        router.push(`/dashboard/agents/${agent.id}/create`)
+      } else {
+        throw new Error("Failed to create agent")
+      }
     } catch (error) {
       console.error("Error creating agent:", error)
       toast({

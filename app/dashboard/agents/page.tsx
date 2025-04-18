@@ -33,14 +33,18 @@ export default function AgentsPage() {
       // Create a temporary agent in the database first
       const initialData = {
         name: "Nouvel agent",
-        status: "draft",
+        status: "draft" as "active" | "inactive" | "draft",
       }
 
       // Create a temporary agent and get its ID
-      const agentId = await agentService.createTemporaryAgent(initialData)
+      const agent = await agentService.createAgent(initialData)
 
-      // Navigate to the first step of agent creation with the real ID
-      router.push(`/agents/${agentId}/create`)
+      if (agent) {
+        // Navigate to the first step of agent creation with the real ID
+        router.push(`/dashboard/agents/${agent.id}/create`)
+      } else {
+        throw new Error("Failed to create agent")
+      }
     } catch (error) {
       console.error("Error creating agent:", error)
       toast({

@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
+import { authMiddleware } from "./middleware/auth"
 
 export async function middleware(req: NextRequest) {
   console.log("🔍 Middleware running for path:", req.nextUrl.pathname)
+  
+  // Check auth first and redirect if necessary
+  const authResponse = authMiddleware(req)
+  if (authResponse) {
+    console.log("🚪 Auth middleware redirecting")
+    return authResponse
+  }
+
   const res = NextResponse.next()
 
   // Create Supabase client for middleware

@@ -14,15 +14,15 @@ export function SubscriptionPlans() {
 
   // Initialiser le plan sélectionné avec le plan actuel de l'utilisateur
   useState(() => {
-    if (subscription?.plan_name) {
-      setSelectedPlan(subscription.plan_name)
+    if (subscription?.planName) {
+      setSelectedPlan(subscription.planName)
     }
   })
 
   // Fonction pour changer de plan d'abonnement
   const handlePlanChange = async (planId: string) => {
     // Éviter de changer pour le même plan
-    if (subscription?.plan_name === planId) {
+    if (subscription?.planName === planId) {
       toast({
         title: "Information",
         description: "Vous êtes déjà abonné à ce plan.",
@@ -41,7 +41,7 @@ export function SubscriptionPlans() {
   // Fonction pour finaliser le changement de plan
   const handleSubmitPlanChange = async () => {
     // Éviter de soumettre le même plan
-    if (subscription?.plan_name === selectedPlan) {
+    if (subscription?.planName === selectedPlan) {
       return
     }
 
@@ -84,7 +84,7 @@ export function SubscriptionPlans() {
         showDetailedComparison={true}
       />
 
-      {selectedPlan !== subscription?.plan_name && (
+      {selectedPlan !== subscription?.planName && (
         <div className="flex justify-end mt-6">
           <button
             onClick={handleSubmitPlanChange}

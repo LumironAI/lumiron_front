@@ -44,7 +44,7 @@ export function CreateAgentButton() {
       const agentId = await agentService.createTemporaryAgent(initialData)
 
       // Navigate to the first step of agent creation with the new ID
-      router.push(`/agents/${agentId}/create`)
+      router.push(`/dashboard/agents/${agentId}/create`)
     } catch (error) {
       console.error("Error creating agent:", error)
       toast({
