@@ -7,7 +7,7 @@ import { useSubscription } from "@/hooks/use-subscription"
 import { useRouter } from "next/navigation"
 import { agentService } from "@/services/agent.service"
 import { useToast } from "@/hooks/ui/use-toast"
-// antoine test 2
+// antoine test 3 frontend
 
 export function CreateAgentButton() {
   const [canCreate, setCanCreate] = useState<boolean>(true)
